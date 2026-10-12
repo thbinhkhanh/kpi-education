@@ -233,8 +233,19 @@ export default forwardRef(function SelfEvaluation({
   };
 
   // 3. Cho phép component cha (App.js) gọi hàm handleSaveEvaluation thông qua ref
+  // Cấu hình ref để App.js có thể gọi hàm save và lấy dữ liệu tự đánh giá từ bên ngoài
   useImperativeHandle(ref, () => ({
-    save: handleSaveEvaluation
+    save: handleSaveEvaluation,
+    getCurrentData: () => ({
+      criteriaGroups,
+      achievedScores,
+      criteriaA,
+      groupAScore,
+      normalizedGroupBScore,
+      totalScore,
+      classification,
+      comment
+    })
   }));
 
   const headerCellSx = {

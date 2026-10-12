@@ -313,7 +313,7 @@ export default forwardRef(function TaskEvaluation({
         await exportTaskEvaluationToExcel(tasks, `Bang_danh_gia_KPI.xlsx`);
         setSnackbar({
           open: true,
-          message: "Xuất file Excel thành công!",
+          message: "Xuất file thành công!",
           severity: "success",
         });
       } catch (error) {
