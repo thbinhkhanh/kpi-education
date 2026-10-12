@@ -97,15 +97,20 @@ export default function App() {
         <main style={{ maxWidth: "1600px", margin: "0 auto" }}>
           
           {/* THANH ĐIỀU HƯỚNG VÀ CÁC NÚT THAO TÁC CỐ ĐỊNH Ở ĐẦU TRANG */}
+          {/* THANH ĐIỀU HƯỚNG VÀ CÁC NÚT THAO TÁC CỐ ĐỊNH Ở ĐẦU TRANG */}
           <div style={{ 
             position: "sticky", 
-            top: "12px", 
+            top: "0px", // Sửa từ "12px" thành "0px"
             zIndex: 10, 
             display: "flex", 
             justifyContent: "flex-start", 
             alignItems: "center",
             gap: "10px",
+            //paddingTop: "6px",    // THÊM DÒNG NÀY
+            //paddingBottom: "6px", // THÊM DÒNG NÀY
             marginBottom: "16px",
+            backgroundColor: "#f8fafc", // THÊM DÒNG NÀY ĐỂ CHE HẬU CẢNH KHI CUỘN
+            boxShadow: "0 4px 6px -4px rgba(0, 0, 0, 0.05)", // Thêm bóng mờ nhẹ phân tách nội dung
             flexWrap: "wrap"
           }}>
             {/* Nhóm 3 nút chuyển tab */}
