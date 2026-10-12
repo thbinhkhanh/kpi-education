@@ -188,7 +188,7 @@ export default function App() {
               }}
             >
               <Save size={17} strokeWidth={2.2} />
-              <span>Lưu trang này</span>
+              <span>Lưu</span>
             </button>
 
             {/* NÚT UPLOAD & EXPORT FILE EXCEL (HIỆN KHI Ở TAB "CATALOG" HOẶC "TASKEVALUATION") */}
@@ -234,7 +234,7 @@ export default function App() {
                     }}
                   >
                     <Upload size={17} />
-                    <span>Upload file Excel</span>
+                    <span>Upload</span>
                   </button>
                 )}
 
@@ -269,7 +269,7 @@ export default function App() {
                   }}
                 >
                   <Download size={17} />
-                  <span>Xuất file Excel</span>
+                  <span>Download</span>
                 </button>
               </>
             )}
