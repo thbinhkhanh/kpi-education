@@ -273,9 +273,7 @@ export default forwardRef(function TaskCatalog({
 
     try {
       const importedTasks = await importTaskCatalog(file);
-
       setTasks(importedTasks);
-
       setSnackbar({
         open: true,
         message: `Đã nhập ${importedTasks.length} nhiệm vụ. Vui lòng lưu để cập nhật Firestore.`,
