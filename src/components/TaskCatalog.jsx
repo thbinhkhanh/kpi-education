@@ -72,6 +72,7 @@ const getConvertedScore = (task) =>
   ) / 100;
 
 export default forwardRef(function TaskCatalog({
+  activeTab = "catalog",
   onScoreChange,
   tasks: sharedTasks,
   onTasksChange,
@@ -292,7 +293,7 @@ export default forwardRef(function TaskCatalog({
     }
   };
 
-  
+
   const handleExportClick = () => {
     try {
       exportTaskCatalogToExcel(tasks, `Danh_muc_nhiem_vu_Q3_2026.xlsx`);
@@ -499,6 +500,7 @@ export default forwardRef(function TaskCatalog({
         }}
       >
         <Header 
+          activeTab={activeTab}
           quarter={quarter}
           year={year}
           teacherName={teacherName}

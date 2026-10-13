@@ -85,6 +85,7 @@ const formatScore = (value) =>
   });
 
 export default forwardRef(function TaskEvaluation({
+  activeTab = "taskEvaluation",
   tasks = [],
   onTasksChange,
   onKpiChange,
@@ -428,6 +429,7 @@ export default forwardRef(function TaskEvaluation({
         }}
       >
         <Header 
+          activeTab={activeTab}
           quarter={quarter}
           year={year}
           teacherName={teacherName}

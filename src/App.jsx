@@ -1102,6 +1102,7 @@ export default function App() {
             {activeTab === "evaluation" && (
               <SelfEvaluation
                 ref={selfEvalRef}
+                activeTab={activeTab}
                 groupBScore={groupBScore}
                 taskStats={taskStats}
                 quarter={globalQuarter}
@@ -1117,6 +1118,7 @@ export default function App() {
             {activeTab === "catalog" && (
               <TaskCatalog
                 ref={taskCatalogRef}
+                activeTab={activeTab}
                 tasks={tasks}
                 onTasksChange={setTasks}
                 quarter={globalQuarter}
@@ -1131,6 +1133,7 @@ export default function App() {
             {activeTab === "taskEvaluation" && (
               <TaskEvaluation
                 ref={taskEvaluationRef}
+                activeTab={activeTab}
                 tasks={tasks}
                 onTasksChange={setTasks}
                 onKpiChange={setGroupBScore}

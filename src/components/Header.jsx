@@ -39,7 +39,14 @@ const formatDateText = (date) => {
   return `Bình Khánh, ngày ${day} tháng ${month} năm ${year}`;
 };
 
-// Tạo danh sách các năm (ví dụ từ 2024 đến 2030)
+// 🎯 Ánh xạ đúng 3 tiêu đề tương ứng với từng trang
+const PAGE_TITLES = {
+  evaluation: 'BẢN TỰ ĐÁNH GIÁ, XẾP LOẠI CỦA CÁ NHÂN',
+  catalog: 'DANH MỤC SẢN PHẨM, NHIỆM VỤ ĐƯỢC GIAO',
+  taskEvaluation: 'BẢNG TÍNH ĐIỂM KPI',
+};
+
+// Danh sách các năm trong Dropdown
 const YEARS = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
 
 export default function Header({ 
@@ -47,6 +54,8 @@ export default function Header({
   quarter: propQuarter, 
   year: propYear, 
   teacherName: propTeacherName,
+  activeTab = 'evaluation', // Nhận activeTab từ trang gọi Header
+  customTitle,              // Tiêu đề tùy chỉnh trực tiếp nếu cần
   onQuarterChange, 
   onYearChange,
   onTeacherNameChange 
@@ -54,7 +63,10 @@ export default function Header({
   const [personalInfo, setPersonalInfo] = useState(initialInfo);
   const [date, setDate] = useState('20/08/2026');
   
-  // Dùng giá trị truyền từ App xuống, nếu chưa có thì dùng giá trị mặc định bên trong
+  // Tự động lấy tiêu đề chuẩn theo activeTab
+  const currentTitle = customTitle || PAGE_TITLES[activeTab] || PAGE_TITLES.evaluation;
+
+  // Dùng giá trị truyền từ App xuống, nếu chưa có thì dùng mặc định
   const quarter = propQuarter !== undefined && propQuarter !== null ? propQuarter : '3';
   const year = propYear !== undefined && propYear !== null ? propYear : '2026';
 
@@ -87,7 +99,6 @@ export default function Header({
     );
     setPersonalInfo(updated);
 
-    // Nếu sửa ô "Họ và tên", gọi callback đẩy lên App
     if (personalInfo[index].label === 'Họ và tên') {
       onTeacherNameChange?.(value);
     }
@@ -100,91 +111,92 @@ export default function Header({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mb: 3 }}>
       {/* HEADER THU GỌN - ẨN KHI ĐANG CHỈNH SỬA */}
-    {!expanded && (
-      <Paper
-        variant="outlined"
-        sx={{
-          p: { xs: 1.25, sm: 1.5 },
-          borderColor: '#dbeafe',
-          borderRadius: 2,
-          bgcolor: '#f8fafc',
-        }}
-      >
-        <Box
+      {!expanded && (
+        <Paper
+          variant="outlined"
           sx={{
-            display: 'flex',
-            alignItems: { xs: 'stretch', md: 'center' },
-            justifyContent: 'space-between',
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 1,
+            p: { xs: 1.25, sm: 1.5 },
+            borderColor: '#dbeafe',
+            borderRadius: 2,
+            bgcolor: '#f8fafc',
           }}
         >
           <Box
             sx={{
-              minWidth: 0,
-              flex: 1,
-              textAlign: 'center',
+              display: 'flex',
+              alignItems: { xs: 'stretch', md: 'center' },
+              justifyContent: 'space-between',
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 1,
             }}
           >
-            <Typography
+            <Box
               sx={{
-                fontSize: '1rem',
-                fontWeight: 700,
-                color: '#64748b',
-                textAlign: 'left',
-              }}
-            >
-              {unitName}
-            </Typography>
-
-            <Typography
-              sx={{
-                mt: 0.3,
-                fontSize: { xs: '1rem', sm: '1.5rem' },
-                fontWeight: 800,
-                color: '#1e3a8a',
-                lineHeight: 1.4,
+                minWidth: 0,
+                flex: 1,
                 textAlign: 'center',
               }}
             >
-              BẢN TỰ ĐÁNH GIÁ, XẾP LOẠI CỦA CÁ NHÂN
-            </Typography>
+              <Typography
+                sx={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: '#64748b',
+                  textAlign: 'left',
+                }}
+              >
+                {unitName}
+              </Typography>
 
-            <Typography
+              {/* Tiêu đề tự động thay đổi theo từng trang */}
+              <Typography
+                sx={{
+                  mt: 0.3,
+                  fontSize: { xs: '1rem', sm: '1.4rem' },
+                  fontWeight: 800,
+                  color: '#1e3a8a',
+                  lineHeight: 1.4,
+                  textAlign: 'center',
+                }}
+              >
+                {currentTitle}
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 0.4,
+                  fontSize: '1rem',
+                  color: '#475569',
+                }}
+              >
+                {name}
+                {position ? ` · ${position}` : ''}
+                {' · Quý '}{quarter}
+                {' · Năm '}{year}
+                {date ? ` · Ngày lập ${date}` : ''}
+              </Typography>
+            </Box>
+
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={expanded ? <ExpandLess /> : <EditOutlined />}
+              onClick={() => setExpanded((prev) => !prev)}
               sx={{
-                mt: 0.4,
-                fontSize: '1rem',
-                color: '#475569',
+                flexShrink: 0,
+                alignSelf: { xs: 'flex-start', md: 'center' },
+                textTransform: 'none',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
               }}
             >
-              {name}
-              {position ? ` · ${position}` : ''}
-              {' · Quý '}{quarter}
-              {' · Năm '}{year}
-              {date ? ` · Ngày lập ${date}` : ''}
-            </Typography>
+              {expanded ? 'Thu gọn' : 'Chỉnh sửa'}
+            </Button>
           </Box>
+        </Paper>
+      )}
 
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={expanded ? <ExpandLess /> : <EditOutlined />}
-            onClick={() => setExpanded((prev) => !prev)}
-            sx={{
-              flexShrink: 0,
-              alignSelf: { xs: 'flex-start', md: 'center' },
-              textTransform: 'none',
-              fontWeight: 700,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {expanded ? 'Thu gọn' : 'Chỉnh sửa'}
-          </Button>
-        </Box>
-      </Paper>
-    )}
-
-      {/* PHẦN CHỈNH SỬA */}
+      {/* PHẦN CHỈNH SỬA (MỞ RỘNG) */}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>        
           {/* CƠ QUAN VÀ QUỐC HIỆU */}
@@ -304,6 +316,7 @@ export default function Header({
               width: '100%',
             }}
           >
+            {/* Tiêu đề tự động thay đổi khi ở chế độ chỉnh sửa */}
             <Typography
               sx={{
                 width: '100%',
@@ -314,7 +327,7 @@ export default function Header({
                 textAlign: 'center',
               }}
             >
-              BẢN TỰ ĐÁNH GIÁ, XẾP LOẠI CỦA CÁ NHÂN
+              {currentTitle}
             </Typography>
 
             <Box
@@ -363,7 +376,7 @@ export default function Header({
                 Năm
               </Typography>
 
-              {/* Chọn Năm (Dạng Dropdown Select thay vì nhập tay) */}
+              {/* Chọn Năm */}
               <TextField
                 select
                 value={year}
