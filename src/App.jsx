@@ -824,7 +824,7 @@ export default function App() {
     {
       id: "taskEvaluation",
       label: "Đánh giá kết quả",
-      shortLabel: "Kết quả",
+      shortLabel: "Kết quả KPI",
       icon: ChartNoAxesCombined,
     },
   ];
