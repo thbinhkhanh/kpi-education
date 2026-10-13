@@ -539,6 +539,21 @@ function updateSelfEvaluationSheetXML(xmlContent, evaluationPayload) {
   return new XMLSerializer().serializeToString(xml);
 }
 
+// Hàm hỗ trợ tự động tải file blob mới xuống máy không cần hỏi quyền ghi đè
+function downloadBlob(uint8Array, filename) {
+  const blob = new Blob([uint8Array], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("evaluation");
   const [groupBScore, setGroupBScore] = useState(0);
@@ -563,10 +578,6 @@ export default function App() {
   const openMenu = Boolean(anchorEl);
 
   const handleOpenMenu = (event) => {
-    if (activeTab === "evaluation") {
-      handleUpdateSingleFile(null);
-      return;
-    }
     setAnchorEl(event.currentTarget);
   };
 
@@ -579,6 +590,7 @@ export default function App() {
   const taskCatalogRef = useRef(null);
   const taskEvaluationRef = useRef(null);
   const importFileRef = useRef(null);
+  const templateFileInputRef = useRef(null); // 👈 Input chọn file mẫu ẩn để xử lý không cần ghi đè
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -607,113 +619,69 @@ export default function App() {
     event.target.value = "";
   };
 
-  const handleUpdateSingleFile = async (batchData) => {
-    if (!window.showOpenFilePicker) {
-      setSnackbar({
-        open: true,
-        message: "Trình duyệt không hỗ trợ chọn file.",
-        severity: "error",
-      });
-      return;
-    }
-
+  // 🎯 Hàm xử lý cập nhật file mẫu và tự động tải về không hiện cảnh báo
+  const handleProcessAndDownload = async (file, batchData) => {
     try {
-      const [fileHandle] = await window.showOpenFilePicker({
-        types: [
-          {
-            description: "Excel Files",
-            accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] },
-          },
-        ],
-        multiple: false,
-      });
-
-      if (!fileHandle) return;
-
-      if ((await fileHandle.queryPermission({ mode: "readwrite" })) !== "granted") {
-        if ((await fileHandle.requestPermission({ mode: "readwrite" })) !== "granted") {
-          setSnackbar({
-            open: true,
-            message: "Bạn chưa cấp quyền ghi file!",
-            severity: "warning",
-          });
-          return;
-        }
-      }
-
-      // 🎯 Mở file, kiểm tra và cập nhật tùy theo tab hiện tại
-      const file = await fileHandle.getFile();
       const buffer = new Uint8Array(await file.arrayBuffer());
       const zipFiles = unzipSync(buffer);
       delete zipFiles["xl/calcChain.xml"];
 
-      const writable = await fileHandle.createWritable();
+      if (activeTab === "evaluation") {
+        const sheetPath = getTargetEvaluationSheetPath(zipFiles);
+        const sheetBytes = zipFiles[sheetPath];
+        if (!sheetBytes) throw new Error("File mẫu không hợp lệ");
 
-      try {
-        if (activeTab === "evaluation") {
-          // 1. Kiểm tra sheet Tự đánh giá
-          const sheetPath = getTargetEvaluationSheetPath(zipFiles);
-          const sheetBytes = zipFiles[sheetPath];
-          if (!sheetBytes) {
-            throw new Error("File không hợp lệ");
-          }
+        const rawEvalData = selfEvalRef.current?.getCurrentData ? selfEvalRef.current.getCurrentData() : null;
+        const evaluationData = {
+          ...rawEvalData,
+          quarter: globalQuarter,
+          year: globalYear
+        };
 
-          const rawEvalData = selfEvalRef.current?.getCurrentData ? selfEvalRef.current.getCurrentData() : null;
-          const evaluationData = {
-            ...rawEvalData,
-            quarter: globalQuarter,
-            year: globalYear
-          };
-
-          const updatedXML = updateSelfEvaluationSheetXML(
-            decoder.decode(sheetBytes),
-            evaluationData || {}
-          );
-          zipFiles[sheetPath] = encoder.encode(updatedXML);
-
-        } else if (activeTab === "catalog") {
-          // 2. Kiểm tra sheet Danh mục ("01. Mẫu import")
-          const sheetPath = getTargetCatalogSheetPath(zipFiles);
-          const sheetBytes = zipFiles[sheetPath];
-          if (!sheetBytes) {
-            throw new Error("File không hợp lệ");
-          }
-
-          const updatedXML = updateSheetXML(
-            decoder.decode(sheetBytes),
-            batchData
-          );
-          zipFiles[sheetPath] = encoder.encode(updatedXML);
-        }
+        const updatedXML = updateSelfEvaluationSheetXML(
+          decoder.decode(sheetBytes),
+          evaluationData || {}
+        );
+        zipFiles[sheetPath] = encoder.encode(updatedXML);
 
         const output = zipSync(zipFiles, { level: 1 });
-        await writable.write(output);
-        await writable.close();
+        downloadBlob(output, `Ban_tu_danh_gia_Q${globalQuarter}_${globalYear}.xlsx`);
 
-        setSnackbar({
-          open: true,
-          message: "Cập nhật file thành công!",
-          severity: "success",
-        });
+      } else if (activeTab === "catalog") {
+        const sheetPath = getTargetCatalogSheetPath(zipFiles);
+        const sheetBytes = zipFiles[sheetPath];
+        if (!sheetBytes) throw new Error("File mẫu không hợp lệ");
 
-      } catch (error) {
-        await writable.abort().catch(() => {});
-        setSnackbar({
-          open: true,
-          message: error.message || "File không hợp lệ!",
-          severity: "error",
-        });
+        const updatedXML = updateSheetXML(
+          decoder.decode(sheetBytes),
+          batchData
+        );
+        zipFiles[sheetPath] = encoder.encode(updatedXML);
+
+        const output = zipSync(zipFiles, { level: 1 });
+        downloadBlob(output, `Danh_muc_nhiem_vu_Q${globalQuarter}_${globalYear}.xlsx`);
       }
 
+      setSnackbar({
+        open: true,
+        message: "Tải file thành công!",
+        severity: "success",
+      });
     } catch (error) {
-      if (error.name !== "AbortError") {
-        setSnackbar({
-          open: true,
-          message: "Không thể mở file hoặc đã hủy.",
-          severity: "error",
-        });
-      }
+      setSnackbar({
+        open: true,
+        message: error.message || "File mẫu không hợp lệ!",
+        severity: "error",
+      });
     }
+  };
+
+  // Xử lý khi chọn file mẫu từ máy tính để điền dữ liệu
+  const handleTemplateFileChange = (e, batchData) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleProcessAndDownload(file, batchData);
+    e.target.value = "";
   };
 
   const handleDownloadNewFile = async () => {
@@ -743,6 +711,15 @@ export default function App() {
 
   const handleExportFileChoice = (mode) => {
     handleCloseMenu();
+
+    if (activeTab === "evaluation") {
+      if (mode === "file") {
+        // Mở cửa sổ chọn file mẫu để điền dữ liệu tự động tải về
+        templateFileInputRef.current.onchange = (e) => handleTemplateFileChange(e, null);
+        templateFileInputRef.current.click();
+      }
+      return;
+    }
 
     if (activeTab === "catalog") {
       if (!tasks?.length) {
@@ -783,7 +760,8 @@ export default function App() {
       });
 
       if (mode === "file") {
-        handleUpdateSingleFile(batchData);
+        templateFileInputRef.current.onchange = (e) => handleTemplateFileChange(e, batchData);
+        templateFileInputRef.current.click();
       }
       return;
     }
@@ -873,6 +851,14 @@ export default function App() {
             margin: "0 auto",
           }}
         >
+          {/* Input ẩn phục vụ chọn file mẫu tải về */}
+          <input
+            ref={templateFileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            hidden
+          />
+
           {/* Thanh điều hướng và nút thao tác phân tách rõ ràng trái/phải */}
           <div
             style={{
@@ -939,7 +925,6 @@ export default function App() {
                       strokeWidth={isActive ? 2.4 : 1.8}
                       style={{ flexShrink: 0 }}
                     />
-                    {/* Hiển thị chuẩn xác shortLabel trên điện thoại và label đầy đủ trên máy tính */}
                     <span>{isMobile ? tab.shortLabel : tab.label}</span>
                   </button>
                 );
@@ -1031,6 +1016,30 @@ export default function App() {
                     <span>Xuất file</span>
                   </button>
 
+                  {/* Menu cho tab Bản tự đánh giá (evaluation) */}
+                  {activeTab === "evaluation" && (
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={openMenu}
+                      onClose={handleCloseMenu}
+                      PaperProps={{
+                        sx: {
+                          borderRadius: 2,
+                          mt: 1,
+                          minWidth: 220,
+                          boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                        },
+                      }}
+                    >
+                      <MenuItem onClick={() => handleExportFileChoice("file")}>
+                        <ListItemIcon>
+                          <FileSpreadsheet size={18} color="#2563eb" />
+                        </ListItemIcon>
+                        <ListItemText primary="Chọn file mẫu từ máy tính" secondary="Cập nhật Bản tự đánh giá" />
+                      </MenuItem>
+                    </Menu>
+                  )}
+
                   {/* Menu cho tab Danh mục nhiệm vụ */}
                   {activeTab === "catalog" && (
                     <Menu
@@ -1050,7 +1059,7 @@ export default function App() {
                         <ListItemIcon>
                           <FileSpreadsheet size={18} color="#2563eb" />
                         </ListItemIcon>
-                        <ListItemText primary="Chọn file từ máy tính" secondary="Cập nhật Danh mục nhiệm vụ" />
+                        <ListItemText primary="Chọn file mẫu từ máy tính" secondary="Cập nhật Danh mục nhiệm vụ" />
                       </MenuItem>
 
                       <MenuItem onClick={() => handleExportFileChoice("downloadNew")}>
@@ -1064,7 +1073,7 @@ export default function App() {
                 </>
               )}
 
-              {/* Nút Lưu (Primary Action đặt ở ngoài cùng bên phải) */}
+              {/* Nút Lưu */}
               <button
                 type="button"
                 onClick={handleGlobalSave}
