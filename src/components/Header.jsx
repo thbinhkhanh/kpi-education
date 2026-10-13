@@ -169,11 +169,10 @@ export default function Header({
                   color: '#475569',
                 }}
               >
-                {name}
-                {position ? ` · ${position}` : ''}
-                {' · Quý '}{quarter}
-                {' · Năm '}{year}
-                {date ? ` · Ngày lập ${date}` : ''}
+                {/*{name}*/}
+                {quarter ? ` Quý ${quarter}` : ''}
+                {year ? `/${year}` : ''}
+                {/*{date ? ` · Ngày lập ${date}` : ''}*/}
               </Typography>
             </Box>
 
