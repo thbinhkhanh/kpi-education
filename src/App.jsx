@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   ClipboardCheck,
   ListTodo,
@@ -64,7 +64,7 @@ function parseXML(content) {
   return xml;
 }
 
-// 🎯 Kiểm tra và lấy đường dẫn sheet cho Danh mục nhiệm vụ (Bắt buộc sheet tên chính xác "1. Mẫu import")
+// 🎯 Kiểm tra và lấy đường dẫn sheet cho Danh mục nhiệm vụ (Bắt buộc sheet tên chính xác "01. Mẫu import")
 function getTargetCatalogSheetPath(files) {
   const workbookFile = files["xl/workbook.xml"];
   const relsFile = files["xl/_rels/workbook.xml.rels"];
@@ -544,6 +544,15 @@ export default function App() {
   const [groupBScore, setGroupBScore] = useState(0);
   const [tasks, setTasks] = useState([]);
 
+  // State theo dõi kích thước màn hình để tự động co giãn nhãn Tab chuẩn xác
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // State dùng chung
   const [globalQuarter, setGlobalQuarter] = useState("3");
   const [globalYear, setGlobalYear] = useState("2026");
@@ -663,7 +672,7 @@ export default function App() {
           zipFiles[sheetPath] = encoder.encode(updatedXML);
 
         } else if (activeTab === "catalog") {
-          // 2. Kiểm tra sheet Danh mục ("1. Mẫu import")
+          // 2. Kiểm tra sheet Danh mục ("01. Mẫu import")
           const sheetPath = getTargetCatalogSheetPath(zipFiles);
           const sheetBytes = zipFiles[sheetPath];
           if (!sheetBytes) {
@@ -689,7 +698,6 @@ export default function App() {
 
       } catch (error) {
         await writable.abort().catch(() => {});
-        // Thông báo lỗi cụ thể khi file không hợp lệ hoặc sai sheet
         setSnackbar({
           open: true,
           message: error.message || "File không hợp lệ!",
@@ -799,20 +807,24 @@ export default function App() {
     exceededTasks: 0,
   });
 
+  // Khai báo cấu trúc danh sách Tab có kèm nhãn ngắn (shortLabel) chuẩn xác cho mobile
   const tabs = [
     {
       id: "evaluation",
       label: "Bản tự đánh giá",
+      shortLabel: "Tự đánh giá",
       icon: ClipboardCheck,
     },
     {
       id: "catalog",
       label: "Danh mục nhiệm vụ",
+      shortLabel: "Danh mục",
       icon: ListTodo,
     },
     {
       id: "taskEvaluation",
       label: "Đánh giá kết quả",
+      shortLabel: "Kết quả",
       icon: ChartNoAxesCombined,
     },
   ];
@@ -861,35 +873,36 @@ export default function App() {
             margin: "0 auto",
           }}
         >
-          {/* Thanh điều hướng và nút thao tác */}
+          {/* Thanh điều hướng và nút thao tác phân tách rõ ràng trái/phải */}
           <div
             style={{
               position: "sticky",
               top: "0px",
               zIndex: 10,
               display: "flex",
-              justifyContent: "flex-start",
+              justifyContent: "space-between",
               alignItems: "center",
-              gap: "10px",
+              gap: "12px",
               marginBottom: "16px",
               backgroundColor: "#f8fafc",
+              padding: "8px 4px",
               boxShadow: "0 4px 6px -4px rgba(0, 0, 0, 0.05)",
               flexWrap: "wrap",
             }}
           >
-            {/* Các tab */}
+            {/* 1. Phía bên trái: Các Tab điều hướng */}
             <nav
               style={{
                 backgroundColor: "#ffffff",
-                padding: "6px",
+                padding: "4px",
                 borderRadius: "12px",
                 border: "1px solid #e2e8f0",
                 display: "grid",
                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: "6px",
+                gap: "4px",
                 boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
                 width: "100%",
-                maxWidth: "550px",
+                maxWidth: "520px",
               }}
             >
               {tabs.map((tab) => {
@@ -905,165 +918,176 @@ export default function App() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "6px",
-                      padding: "8px 12px",
+                      gap: "4px",
+                      padding: "8px 6px",
                       borderRadius: "8px",
                       border: "none",
                       cursor: "pointer",
                       fontWeight: 600,
-                      fontSize: "13px",
+                      fontSize: "12px",
                       transition: "all 0.2s",
-                      backgroundColor: isActive
-                        ? "#2563eb"
-                        : "#f1f5f9",
+                      backgroundColor: isActive ? "#2563eb" : "transparent",
                       color: isActive ? "#ffffff" : "#475569",
                       boxShadow: isActive
                         ? "0 4px 6px -1px rgba(37, 99, 235, 0.2)"
                         : "none",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     <Icon
-                      size={16}
+                      size={15}
                       strokeWidth={isActive ? 2.4 : 1.8}
+                      style={{ flexShrink: 0 }}
                     />
-                    <span>{tab.label}</span>
+                    {/* Hiển thị chuẩn xác shortLabel trên điện thoại và label đầy đủ trên máy tính */}
+                    <span>{isMobile ? tab.shortLabel : tab.label}</span>
                   </button>
                 );
               })}
             </nav>
 
-            {/* Nút Lưu */}
-            <button
-              type="button"
-              onClick={handleGlobalSave}
+            {/* 2. Phía bên phải: Nhóm các nút hành động (Nhập file, Xuất file, Lưu) */}
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                padding: "10px 18px",
-                borderRadius: "12px",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: "13.5px",
-                backgroundColor: "#059669",
-                color: "#ffffff",
-                boxShadow: "0 4px 10px rgba(5, 150, 105, 0.25)",
-                transition: "all 0.2s ease",
+                flexWrap: "wrap",
               }}
             >
-              <Save size={17} strokeWidth={2.2} />
-              <span>Lưu</span>
-            </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                hidden
+                onChange={handleImportFile}
+              />
 
-            {/* Upload và Cập nhật file */}
-            {(activeTab === "catalog" ||
-              activeTab === "evaluation" ||
-              activeTab === "taskEvaluation") && (
-              <>
-                <input
-                  ref={importFileRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  hidden
-                  onChange={handleImportFile}
-                />
-
-                {activeTab === "catalog" && (
-                  <button
-                    type="button"
-                    onClick={() => importFileRef.current?.click()}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "10px 18px",
-                      borderRadius: "12px",
-                      border: "1px solid #2563eb",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                      fontSize: "13.5px",
-                      backgroundColor: "#ffffff",
-                      color: "#2563eb",
-                      boxShadow: "0 2px 6px rgba(37, 99, 235, 0.1)",
-                    }}
-                  >
-                    <Upload size={17} />
-                    <span>Nhập file</span>
-                  </button>
-                )}
-
-                {/* Nút chính */}
-                {/* Nút chính */}
+              {/* Nút Nhập file */}
+              {activeTab === "catalog" && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    if (activeTab === "taskEvaluation") {
-                      if (taskEvaluationRef.current?.exportExcel) {
-                        taskEvaluationRef.current.exportExcel();
-                      } else {
-                        setSnackbar({
-                          open: true,
-                          message: "Trang Đánh giá kết quả chưa hỗ trợ export Excel!",
-                          severity: "warning",
-                        });
-                      }
-                    } else {
-                      handleOpenMenu(e);
-                    }
-                  }}
+                  onClick={() => importFileRef.current?.click()}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "8px",
-                    padding: "10px 18px",
-                    borderRadius: "12px",
-                    border: "1px solid #059669",
+                    gap: "6px",
+                    padding: "9px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
                     cursor: "pointer",
-                    fontWeight: 700,
-                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    fontSize: "13px",
                     backgroundColor: "#ffffff",
-                    color: "#059669",
-                    boxShadow: "0 2px 6px rgba(5, 150, 105, 0.1)",
+                    color: "#475569",
+                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
                     transition: "all 0.2s ease",
                   }}
                 >
-                  <Download size={17} />
-                  <span>Xuất file</span>
+                  <Upload size={16} className="text-gray-500" />
+                  <span>Nhập file</span>
                 </button>
+              )}
 
-                {/* Menu cho tab Danh mục nhiệm vụ */}
-                {activeTab === "catalog" && (
-                  <Menu
-                    anchorEl={anchorEl}
-                    open={openMenu}
-                    onClose={handleCloseMenu}
-                    PaperProps={{
-                      sx: {
-                        borderRadius: 2,
-                        mt: 1,
-                        minWidth: 220,
-                        boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
-                      },
+              {/* Nút Xuất file */}
+              {(activeTab === "catalog" ||
+                activeTab === "evaluation" ||
+                activeTab === "taskEvaluation") && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (activeTab === "taskEvaluation") {
+                        if (taskEvaluationRef.current?.exportExcel) {
+                          taskEvaluationRef.current.exportExcel();
+                        } else {
+                          setSnackbar({
+                            open: true,
+                            message: "Trang Đánh giá kết quả chưa hỗ trợ export Excel!",
+                            severity: "warning",
+                          });
+                        }
+                      } else {
+                        handleOpenMenu(e);
+                      }
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "9px 14px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      fontSize: "13px",
+                      backgroundColor: "#ffffff",
+                      color: "#475569",
+                      boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+                      transition: "all 0.2s ease",
                     }}
                   >
-                    <MenuItem onClick={() => handleExportFileChoice("file")}>
-                      <ListItemIcon>
-                        <FileSpreadsheet size={18} color="#2563eb" />
-                      </ListItemIcon>
-                      <ListItemText primary="Chọn file từ máy tính" secondary="Cập nhật Danh mục nhiệm vụ" />
-                    </MenuItem>
+                    <Download size={16} className="text-gray-500" />
+                    <span>Xuất file</span>
+                  </button>
 
-                    <MenuItem onClick={() => handleExportFileChoice("downloadNew")}>
-                      <ListItemIcon>
-                        <Download size={18} color="#d97706" />
-                      </ListItemIcon>
-                      <ListItemText primary="Tải về file mới" secondary="Tạo và tải file excel mới" />
-                    </MenuItem>
-                  </Menu>
-                )}
-              </>
-            )}
+                  {/* Menu cho tab Danh mục nhiệm vụ */}
+                  {activeTab === "catalog" && (
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={openMenu}
+                      onClose={handleCloseMenu}
+                      PaperProps={{
+                        sx: {
+                          borderRadius: 2,
+                          mt: 1,
+                          minWidth: 220,
+                          boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                        },
+                      }}
+                    >
+                      <MenuItem onClick={() => handleExportFileChoice("file")}>
+                        <ListItemIcon>
+                          <FileSpreadsheet size={18} color="#2563eb" />
+                        </ListItemIcon>
+                        <ListItemText primary="Chọn file từ máy tính" secondary="Cập nhật Danh mục nhiệm vụ" />
+                      </MenuItem>
+
+                      <MenuItem onClick={() => handleExportFileChoice("downloadNew")}>
+                        <ListItemIcon>
+                          <Download size={18} color="#d97706" />
+                        </ListItemIcon>
+                        <ListItemText primary="Tải về file mới" secondary="Tạo và tải file excel mới" />
+                      </MenuItem>
+                    </Menu>
+                  )}
+                </>
+              )}
+
+              {/* Nút Lưu (Primary Action đặt ở ngoài cùng bên phải) */}
+              <button
+                type="button"
+                onClick={handleGlobalSave}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 18px",
+                  borderRadius: "10px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "13px",
+                  backgroundColor: "#059669",
+                  color: "#ffffff",
+                  boxShadow: "0 2px 6px rgba(5, 150, 105, 0.25)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <Save size={16} strokeWidth={2.2} />
+                <span>Lưu</span>
+              </button>
+            </div>
           </div>
 
           {/* Nội dung trang */}
@@ -1122,6 +1146,7 @@ export default function App() {
           </section>
         </main>
 
+        {/* Snackbar thông báo */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={4000}
@@ -1132,7 +1157,7 @@ export default function App() {
             onClose={handleCloseSnackbar}
             severity={snackbar.severity}
             variant="filled"
-            sx={{ width: "100%", fontWeight: 600 }}
+            sx={{ width: "100%" }}
           >
             {snackbar.message}
           </Alert>
