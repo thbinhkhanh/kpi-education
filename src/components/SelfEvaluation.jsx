@@ -9,20 +9,21 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Button,
   Checkbox,
   TextField,
   Snackbar,
   Alert,
 } from '@mui/material';
-import Check from '@mui/icons-material/Check';
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
+
+//import Check from '@mui/icons-material/Check';
 import Header from './Header';
-import SaveOutlined from '@mui/icons-material/SaveOutlined';
 import { saveSelfEvaluation } from '../utils/saveSelfEvaluation';
 import { getSelfEvaluation } from '../utils/saveSelfEvaluation';
 import { useTaskCatalog } from '../contexts/TaskCatalogContext';
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { Check, AssignmentOutlined } from '@mui/icons-material';
+
 
 // Hàm làm tròn thông minh: tối đa 1 số lẻ, nếu phần thập phân là 0 thì bỏ
 const formatScore = (value) => {
@@ -36,12 +37,12 @@ export default forwardRef(function SelfEvaluation({
   onNavigateCatalog,
   groupBScore = 0,
   taskStats: propTaskStats = {},
-  quarter,       // <--- Thêm dòng này
-  year,          // <--- Thêm dòng này
-  teacherName,   // <--- Thêm dòng này
-  onQuarterChange, // <--- Thêm dòng này
-  onYearChange,    // <--- Thêm dòng này
-  onTeacherNameChange, // <--- Thêm dòng này
+  quarter,       
+  year,          
+  teacherName,   
+  onQuarterChange, 
+  onYearChange,    
+  onTeacherNameChange, 
 }, ref) {
   const { selfEvaluationCache, setSelfEvaluationCache } = useTaskCatalog();
   const [criteriaA, setCriteriaA] = useState({});
@@ -136,6 +137,7 @@ export default forwardRef(function SelfEvaluation({
   }, []);
 
   // Hiệu ứng tải điểm từ KPI_TASK_EVALUATION nếu groupBScore bằng 0
+  // Hiệu ứng tải điểm từ KPI_TASK_EVALUATION nếu groupBScore bằng 0
   useEffect(() => {
     const year = headerData?.year;
     const quarter = headerData?.quarter;
@@ -143,7 +145,11 @@ export default forwardRef(function SelfEvaluation({
       ?.find((item) => item.label?.trim() === 'Họ và tên')
       ?.value?.trim();
 
-    if (!year || !quarter || !teacherId) return;
+    // 🎯 Khi đổi kỳ mà thiếu thông tin, reset ngay điểm dự phòng về 0
+    if (!year || !quarter || !teacherId) {
+      setFallbackGroupBScore(0);
+      return;
+    }
 
     let cancelled = false;
 
@@ -158,22 +164,26 @@ export default forwardRef(function SelfEvaluation({
           const evalData = snapshot.data();
           const score = evalData.totalScore ?? evalData.groupBScore ?? 0;
           setFallbackGroupBScore(Number(score));
+        } else {
+          // 🎯 Nếu không tồn tại dữ liệu trên Firestore cho kỳ này, ép về 0 tuyệt đối không dùng cache cũ
+          setFallbackGroupBScore(0);
         }
       } catch (error) {
-        console.error("Lỗi lấy dữ liệu từ KPI_TASK_EVALUATION:", error);
+        if (!cancelled) {
+          console.error("Lỗi lấy dữ liệu từ KPI_TASK_EVALUATION:", error);
+          setFallbackGroupBScore(0);
+        }
       }
     };
 
-    if (Number(groupBScore) === 0) {
-      fetchTaskEvaluationScore();
-    }
+    fetchTaskEvaluationScore();
 
     return () => {
       cancelled = true;
     };
-  }, [headerData?.year, headerData?.quarter, headerData?.personalInfo, groupBScore]);
+  }, [headerData?.year, headerData?.quarter, headerData?.personalInfo]);
 
-  // 2. Đưa logic lưu ra thành một hàm riêng để có thể gọi từ ref hoặc nút bấm
+  // Logic lưu bản tự đánh giá
   const handleSaveEvaluation = async () => {
     try {
       const teacherId = headerData?.personalInfo
@@ -200,7 +210,7 @@ export default forwardRef(function SelfEvaluation({
         groupBScore: normalizedGroupBScore,
         totalScore,
         classification,
-        taskStats: activeTaskStats, // Đảm bảo lưu đúng taskStats thực tế
+        taskStats: activeTaskStats,
       };
 
       await saveSelfEvaluation({
@@ -232,8 +242,6 @@ export default forwardRef(function SelfEvaluation({
     }
   };
 
-  // 3. Cho phép component cha (App.js) gọi hàm handleSaveEvaluation thông qua ref
-  // Cấu hình ref để App.js có thể gọi hàm save và lấy dữ liệu tự đánh giá từ bên ngoài
   useImperativeHandle(ref, () => ({
     save: handleSaveEvaluation,
     getCurrentData: () => ({
@@ -338,7 +346,7 @@ export default forwardRef(function SelfEvaluation({
           <Checkbox
             size="small"
             color="error"
-            checked={!criteriaA[item.id]}
+            checked={Boolean(criteriaA[item.id] === false)}
             onChange={() => handleCheckboxChange(item.id)}
           />
         </TableCell>
@@ -351,7 +359,7 @@ export default forwardRef(function SelfEvaluation({
           <TextField
             type="number"
             size="small"
-            value={achievedScores[item.id] ?? 0}
+            value={achievedScores[item.id] ?? max}
             onChange={(e) =>
               handleScoreChange(item.id, e.target.value, max)
             }
@@ -389,23 +397,18 @@ export default forwardRef(function SelfEvaluation({
 
     const cacheKey = `${year}_Q${quarter}_${teacherId}`;
 
-    const applyData = (data) => {
-      setCriteriaGroups(data.criteriaGroups ?? []);
-      setCriteriaA(data.selfEvaluation?.criteriaA ?? {});
-      setAchievedScores(data.selfEvaluation?.achievedScores ?? {});
-      setComment(data.selfEvaluation?.comment ?? '');
-      // Khôi phục taskStats từ dữ liệu đã lưu nếu có
-      if (data.taskStats) {
-        setSavedTaskStats(data.taskStats);
-      }
-    };
-
     const loadData = async () => {
       try {
         const cachedData = selfEvaluationCache[cacheKey];
 
         if (cachedData) {
-          applyData(cachedData);
+          setCriteriaGroups(cachedData.criteriaGroups ?? []);
+          setCriteriaA(cachedData.selfEvaluation?.criteriaA ?? {});
+          setAchievedScores(cachedData.selfEvaluation?.achievedScores ?? {});
+          setComment(cachedData.selfEvaluation?.comment ?? '');
+          if (cachedData.taskStats) {
+            setSavedTaskStats(cachedData.taskStats);
+          }
           return;
         }
 
@@ -423,11 +426,22 @@ export default forwardRef(function SelfEvaluation({
             [cacheKey]: data,
           }));
 
-          applyData(data);
+          setCriteriaGroups(data.criteriaGroups ?? []);
+          setCriteriaA(data.selfEvaluation?.criteriaA ?? {});
+          setAchievedScores(data.selfEvaluation?.achievedScores ?? {});
+          setComment(data.selfEvaluation?.comment ?? '');
+          if (data.taskStats) {
+            setSavedTaskStats(data.taskStats);
+          }
         } else {
-          setCriteriaGroups([]);
-          setCriteriaA({});
-          setAchievedScores({});
+          // 🎯 Chỉ lấy mẫu khung tiêu chí nếu thực sự có tồn tại dữ liệu từ cache của chính quý/năm đó, tránh lấy nhầm dữ liệu rỗng hoặc sai lệch từ tab khác
+          const cachedData = selfEvaluationCache[cacheKey];
+          const emptyCriteriaA = {};
+          const emptyAchievedScores = {};
+
+          setCriteriaGroups(cachedData?.criteriaGroups ?? []);
+          setCriteriaA(emptyCriteriaA);
+          setAchievedScores(emptyAchievedScores);
           setComment('');
           setSavedTaskStats(null);
         }
@@ -512,6 +526,7 @@ export default forwardRef(function SelfEvaluation({
         </Box>
 
         {/* NHÓM A */}
+        {/* NHÓM A */}
         <Box sx={{ mb: 4 }}>
           <Box
             sx={{
@@ -555,321 +570,406 @@ export default forwardRef(function SelfEvaluation({
             </Box>
           </Box>
 
-          <TableContainer
-            component={Paper}
-            variant="outlined"
-            sx={{
-              borderColor: '#e2e8f0',
-              borderRadius: '0 0 10px 10px',
-              overflowX: 'auto',
-            }}
-          >
-            <Table
-              size="small"
+          {criteriaGroups.length === 0 ? (
+            <Paper
+              variant="outlined"
               sx={{
-                minWidth: 850,
-                tableLayout: 'auto',
-                '& th, & td': {
-                  borderColor: '#e8edf4',
-                },
+                p: 6,
+                textAlign: 'center',
+                borderColor: '#e2e8f0',
+                borderRadius: '0 0 10px 10px',
+                bgcolor: '#fff',
               }}
             >
-              <TableHead>
-                <TableRow>
-                  <TableCell
-                    align="center"
-                    sx={{ ...headerCellSx, width: 55 }}
-                  >
-                    TT
-                  </TableCell>
-                  <TableCell sx={headerCellSx}>
-                    TIÊU CHÍ / NỘI DUNG
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ ...headerCellSx, width: 95 }}
-                  >
-                    Đảm bảo (X)
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ ...headerCellSx, width: 110 }}
-                  >
-                    Không đảm bảo
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ ...headerCellSx, width: 90 }}
-                  >
-                    Điểm tối đa
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ ...headerCellSx, width: 85 }}
-                  >
-                    Điểm đạt
-                  </TableCell>
-                </TableRow>
-              </TableHead>
+              <AssignmentOutlined
+                sx={{ fontSize: 42, color: '#cbd5e1', mb: 1 }}
+              />
+              <Typography sx={{ color: '#64748b', fontWeight: 600 }}>
+                Chưa có dữ liệu đánh giá
+              </Typography>
+              <Typography
+                sx={{ color: '#94a3b8', fontSize: '0.8rem', mt: 0.5 }}
+              >
+                Chưa có tiêu chí Nhóm A cho quý/năm này
+              </Typography>
+            </Paper>
+          ) : (
+            <TableContainer
+              component={Paper}
+              variant="outlined"
+              sx={{
+                borderColor: '#e2e8f0',
+                borderRadius: '0 0 10px 10px',
+                overflowX: 'auto',
+              }}
+            >
+              <Table
+                size="small"
+                sx={{
+                  minWidth: 850,
+                  tableLayout: 'auto',
+                  '& th, & td': {
+                    borderColor: '#e8edf4',
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      align="center"
+                      sx={{ ...headerCellSx, width: 55 }}
+                    >
+                      TT
+                    </TableCell>
+                    <TableCell sx={headerCellSx}>
+                      TIÊU CHÍ / NỘI DUNG
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ ...headerCellSx, width: 95 }}
+                    >
+                      Đảm bảo (X)
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ ...headerCellSx, width: 110 }}
+                    >
+                      Không đảm bảo
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ ...headerCellSx, width: 90 }}
+                    >
+                      Điểm tối đa
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ ...headerCellSx, width: 85 }}
+                    >
+                      Điểm đạt
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
 
-              <TableBody>
-                {criteriaGroups.map((group) => (
-                  <React.Fragment key={group.title}>
-                    <TableRow>
-                      <TableCell
-                        align="center"
-                        sx={{
-                          ...bodyCellSx,
-                          fontWeight: 800,
-                          bgcolor: '#eff6ff',
-                          color: '#1d4ed8',
-                        }}
-                      >
-                        {group.title}
+                <TableBody>
+                  {criteriaGroups.map((group) => (
+                    <React.Fragment key={group.title}>
+                      <TableRow>
+                        <TableCell
+                          align="center"
+                          sx={{
+                            ...bodyCellSx,
+                            fontWeight: 800,
+                            bgcolor: '#eff6ff',
+                            color: '#1d4ed8',
+                          }}
+                        >
+                          {group.title}
+                        </TableCell>
+
+                        <TableCell
+                          colSpan={3}
+                          sx={{
+                            ...bodyCellSx,
+                            fontWeight: 700,
+                            bgcolor: '#eff6ff',
+                            color: '#1e3a8a',
+                            lineHeight: 1.7,
+                          }}
+                        >
+                          {group.heading}
+                        </TableCell>
+
+                        <TableCell
+                          align="center"
+                          sx={{
+                            ...bodyCellSx,
+                            fontWeight: 800,
+                            bgcolor: '#eff6ff',
+                          }}
+                        >
+                          {group.max}
+                        </TableCell>
+
+                        <TableCell
+                          align="center"
+                          sx={{
+                            ...bodyCellSx,
+                            fontWeight: 800,
+                            color: '#15803d',
+                            bgcolor: '#eff6ff',
+                          }}
+                        >
+                          {formatScore(
+                            group.items.reduce(
+                              (sum, item) =>
+                                sum + (Number(achievedScores[item.id]) || 0),
+                              0
+                            )
+                          )}
+                        </TableCell>
+                      </TableRow>
+
+                      {group.items.map(renderCriteriaRow)}
+                    </React.Fragment>
+                  ))}
+
+                  <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+                    <TableCell
+                      colSpan={4}
+                      sx={{
+                        ...bodyCellSx,
+                        fontWeight: 800,
+                        color: '#1e293b',
+                        py: 1.5,
+                      }}
+                    >
+                      TỔNG CỘNG NHÓM (A)
+                    </TableCell>
+
+                    <TableCell
+                      align="center"
+                      sx={{ ...bodyCellSx, fontWeight: 800 }}
+                    >
+                      30
+                    </TableCell>
+
+                    <TableCell
+                      align="center"
+                      sx={{
+                        ...bodyCellSx,
+                        fontWeight: 800,
+                        color: '#1d4ed8',
+                      }}
+                    >
+                      {formatScore(groupAScore)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
+
+        {/* NHÓM B & TỔNG ĐIỂM + XẾP LOẠI */}
+        {totalTasks === 0 && Number(normalizedGroupBScore) === 0 ? (
+          <Box sx={{ mb: 3 }}>
+            <Box
+              sx={{
+                ...sectionBarSx,
+                bgcolor: '#1e40af',
+                borderRadius: '10px 10px 0 0',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'rgba(255,255,255,0.15)',
+                    borderRadius: 1,
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  B
+                </Box>
+
+                <Typography sx={{ fontSize: 'inherit', fontWeight: 800 }}>
+                  KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM) & TỔNG KẾT ĐIỂM
+                </Typography>
+              </Box>
+            </Box>
+
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 5,
+                textAlign: 'center',
+                borderColor: '#e2e8f0',
+                borderRadius: '0 0 10px 10px',
+                bgcolor: '#fff',
+              }}
+            >
+              <AssignmentOutlined
+                sx={{ fontSize: 40, color: '#cbd5e1', mb: 1 }}
+              />
+              <Typography sx={{ color: '#64748b', fontWeight: 600 }}>
+                Chưa có dữ liệu nhiệm vụ
+              </Typography>
+              <Typography
+                sx={{ color: '#94a3b8', fontSize: '0.8rem', mt: 0.5 }}
+              >
+                Chưa có thông tin kết quả thực hiện nhiệm vụ cho quý/năm này
+              </Typography>
+            </Paper>
+          </Box>
+        ) : (
+          <>
+            {/* NHÓM B & TỔNG ĐIỂM */}
+            <Box sx={{ mb: 3 }}>
+              <Box
+                sx={{
+                  ...sectionBarSx,
+                  bgcolor: '#1e40af',
+                  borderRadius: '10px 10px 0 0',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'rgba(255,255,255,0.15)',
+                      borderRadius: 1,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    B
+                  </Box>
+
+                  <Typography sx={{ fontSize: 'inherit', fontWeight: 800 }}>
+                    KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM) & TỔNG KẾT ĐIỂM
+                  </Typography>
+                </Box>
+              </Box>
+
+              <TableContainer
+                component={Paper}
+                variant="outlined"
+                sx={{
+                  borderRadius: '0 0 10px 10px',
+                  borderColor: '#e2e8f0',
+                  overflow: 'hidden',
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{
+                    '& td, & th': {
+                      borderColor: '#e8edf4',
+                      py: 1.2,
+                      px: { xs: 1.5, sm: 2 },
+                    },
+                  }}
+                >
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                      <TableCell sx={{ width: '65%', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>NỘI DUNG</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: '#64748b', fontSize: '0.8rem', width: 90 }}>Điểm tối đa</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: '#64748b', fontSize: '0.8rem', width: 100 }}>Điểm đạt được</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow sx={{ '&:hover': { bgcolor: '#f8fbff' } }}>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e3a8a' }}>
+                        TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm
                       </TableCell>
-
-                      <TableCell
-                        colSpan={3}
-                        sx={{
-                          ...bodyCellSx,
-                          fontWeight: 700,
-                          bgcolor: '#eff6ff',
-                          color: '#1e3a8a',
-                          lineHeight: 1.7,
-                        }}
-                      >
-                        {group.heading}
-                      </TableCell>
-
-                      <TableCell
-                        align="center"
-                        sx={{
-                          ...bodyCellSx,
-                          fontWeight: 800,
-                          bgcolor: '#eff6ff',
-                        }}
-                      >
-                        {group.max}
-                      </TableCell>
-
-                      <TableCell
-                        align="center"
-                        sx={{
-                          ...bodyCellSx,
-                          fontWeight: 800,
-                          color: '#15803d',
-                          bgcolor: '#eff6ff',
-                        }}
-                      >
-                        {formatScore(
-                          group.items.reduce(
-                            (sum, item) =>
-                              sum + (Number(achievedScores[item.id]) || 0),
-                            0
-                          )
-                        )}
+                      <TableCell align="center" sx={{ fontWeight: 700, fontSize: '1.2rem' }}>70</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 800, fontSize: '1.2rem', color: '#1d4ed8' }}>
+                        {formatScore(normalizedGroupBScore)}
                       </TableCell>
                     </TableRow>
 
-                    {group.items.map(renderCriteriaRow)}
-                  </React.Fragment>
-                ))}
+                    <TableRow sx={{ bgcolor: '#dcfce7' }}>
+                      <TableCell sx={{ fontWeight: 900, color: '#166534' }}>
+                        TỔNG CỘNG (A + B)
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 900, fontSize: '1.2rem', color: '#166534' }}>100</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 900, fontSize: '1.2rem', color: '#dc2626' }}>
+                        {formatScore(totalScore)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
 
-                <TableRow sx={{ bgcolor: '#f1f5f9' }}>
-                  <TableCell
-                    colSpan={4}
-                    sx={{
-                      ...bodyCellSx,
-                      fontWeight: 800,
-                      color: '#1e293b',
-                      py: 1.5,
-                    }}
-                  >
-                    TỔNG CỘNG NHÓM (A)
-                  </TableCell>
-
-                  <TableCell
-                    align="center"
-                    sx={{ ...bodyCellSx, fontWeight: 800 }}
-                  >
-                    30
-                  </TableCell>
-
-                  <TableCell
-                    align="center"
-                    sx={{
-                      ...bodyCellSx,
-                      fontWeight: 800,
-                      color: '#1d4ed8',
-                    }}
-                  >
-                    {formatScore(groupAScore)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-
-        {/* --- NHÓM B & TỔNG ĐIỂM TÍCH HỢP GỌN GÀNG --- */}
-        <Box sx={{ mb: 3 }}>
-          <Box
-            sx={{
-              ...sectionBarSx,
-              bgcolor: '#1e40af',
-              borderRadius: '10px 10px 0 0',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box
+            {/* XẾP LOẠI */}
+            <Box sx={{ mb: 3 }}>
+              <Typography
                 sx={{
-                  width: 28,
-                  height: 28,
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  borderRadius: 1,
-                  fontSize: '0.9rem',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  mb: 1.5,
                 }}
               >
-                B
-              </Box>
-
-              <Typography sx={{ fontSize: 'inherit', fontWeight: 800 }}>
-                KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM) & TỔNG KẾT ĐIỂM
+                II. Tự đề xuất xếp loại mức chất lượng
               </Typography>
-            </Box>
-          </Box>
 
-          <TableContainer
-            component={Paper}
-            variant="outlined"
-            sx={{
-              borderRadius: '0 0 10px 10px',
-              borderColor: '#e2e8f0',
-              overflow: 'hidden',
-            }}
-          >
-            <Table
-              size="small"
-              sx={{
-                '& td, & th': {
-                  borderColor: '#e8edf4',
-                  py: 1.2,
-                  px: { xs: 1.5, sm: 2 },
-                },
-              }}
-            >
-              <TableHead>
-                <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                  <TableCell sx={{ width: '65%', fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>NỘI DUNG</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, color: '#64748b', fontSize: '0.8rem', width: 90 }}>Điểm tối đa</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, color: '#64748b', fontSize: '0.8rem', width: 100 }}>Điểm đạt được</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow sx={{ '&:hover': { bgcolor: '#f8fbff' } }}>
-                  <TableCell sx={{ fontWeight: 700, color: '#1e3a8a' }}>
-                    TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, fontSize: '1.2rem' }}>70</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 800, fontSize: '1.2rem', color: '#1d4ed8' }}>
-                    {formatScore(normalizedGroupBScore)}
-                  </TableCell>
-                </TableRow>
-
-                <TableRow sx={{ bgcolor: '#dcfce7' }}>
-                  <TableCell sx={{ fontWeight: 900, color: '#166534' }}>
-                    TỔNG CỘNG (A + B)
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 900, fontSize: '1.2rem', color: '#166534' }}>100</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 900, fontSize: '1.2rem', color: '#dc2626' }}>
-                    {formatScore(totalScore)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-
-        {/* --- XẾP LOẠI (THIẾT KẾ GỌN NGANG, ĐẦY ĐỦ SỐ LIỆU) --- */}
-        <Box sx={{ mb: 3 }}>
-          <Typography
-            sx={{
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              mb: 1.5,
-            }}
-          >
-            II. Tự đề xuất xếp loại mức chất lượng
-          </Typography>
-
-          <Paper
-            variant="outlined"
-            sx={{
-              p: { xs: 1.5, sm: 2 },
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              gap: 2,
-              bgcolor: '#ecfdf5',
-              borderColor: '#a7f3d0',
-              borderRadius: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box
+              <Paper
+                variant="outlined"
                 sx={{
-                  width: 36,
-                  height: 36,
-                  flexShrink: 0,
+                  p: { xs: 1.5, sm: 2 },
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: '#d1fae5',
-                  borderRadius: '50%',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  gap: 2,
+                  bgcolor: '#ecfdf5',
+                  borderColor: '#a7f3d0',
+                  borderRadius: 2,
                 }}
               >
-                <Check sx={{ fontSize: 20, color: '#059669' }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#047857', letterSpacing: '0.05em' }}>
-                  MỨC XẾP LOẠI ĐỀ XUẤT
-                </Typography>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#dc2626' }}>
-                  {classification}
-                </Typography>
-              </Box>
-            </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: '#d1fae5',
+                      borderRadius: '50%',
+                    }}
+                  >
+                    <Check sx={{ fontSize: 20, color: '#059669' }} />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#047857', letterSpacing: '0.05em' }}>
+                      MỨC XẾP LOẠI ĐỀ XUẤT
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#dc2626' }}>
+                      {classification}
+                    </Typography>
+                  </Box>
+                </Box>
 
-            <Box
-              sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: { xs: 1.5, sm: 3 },
-                fontSize: '0.8rem',
-                color: '#334155',
-                borderLeft: { sm: '1px solid #cbd5e1' },
-                pl: { sm: 3 },
-                alignItems: 'center',
-              }}
-            >
-              <Box>
-                Tổng điểm: <strong style={{ color: '#0f172a' }}>{formatScore(totalScore)}/100</strong>
-              </Box>
-              <Box>
-                Hoàn thành: <strong style={{ color: '#0f172a' }}>{completedTasks}/{totalTasks}</strong>
-              </Box>
-              <Box>
-                Vượt mức: <strong style={{ color: '#0f172a' }}>{exceededTasks}/{totalTasks}</strong>
-              </Box>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: { xs: 1.5, sm: 3 },
+                    fontSize: '0.8rem',
+                    color: '#334155',
+                    borderLeft: { sm: '1px solid #cbd5e1' },
+                    pl: { sm: 3 },
+                    alignItems: 'center',
+                  }}
+                >
+                  <Box>
+                    Tổng điểm: <strong style={{ color: '#0f172a' }}>{formatScore(totalScore)}/100</strong>
+                  </Box>
+                  <Box>
+                    Hoàn thành: <strong style={{ color: '#0f172a' }}>{completedTasks}/{totalTasks}</strong>
+                  </Box>
+                  <Box>
+                    Vượt mức: <strong style={{ color: '#0f172a' }}>{exceededTasks}/{totalTasks}</strong>
+                  </Box>
+                </Box>
+              </Paper>
             </Box>
-          </Paper>
-        </Box>
+          </>
+        )}
 
         {/* NHẬN XÉT */}
         <Box sx={{ mb: 3 }}>
@@ -967,7 +1067,7 @@ export default forwardRef(function SelfEvaluation({
         </Box>
       </Paper>
 
-      {/* Snackbar thông báo trạng thái */}
+      {/* Snackbar thông báo */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

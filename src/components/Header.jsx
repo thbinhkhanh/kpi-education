@@ -8,8 +8,8 @@ import {
   Collapse,
   MenuItem,
 } from '@mui/material';
-import EditOutlined from '@mui/icons-material/EditOutlined';
-import ExpandLess from '@mui/icons-material/ExpandLess';
+
+import { ExpandMore, ExpandLess } from "@mui/icons-material";
 
 const initialInfo = [
   { label: 'Họ và tên', value: 'Phạm Văn Thái' },
@@ -66,9 +66,9 @@ export default function Header({
   // Tự động lấy tiêu đề chuẩn theo activeTab
   const currentTitle = customTitle || PAGE_TITLES[activeTab] || PAGE_TITLES.evaluation;
 
-  // Dùng giá trị truyền từ App xuống, nếu chưa có thì dùng mặc định
-  const quarter = propQuarter !== undefined && propQuarter !== null ? propQuarter : '3';
-  const year = propYear !== undefined && propYear !== null ? propYear : '2026';
+  // Dùng giá trị truyền từ App xuống, không tự ý gán cứng về '3' hay '2026' để tránh bị ghi đè khi F5
+  const quarter = propQuarter !== undefined && propQuarter !== null ? propQuarter : '';
+  const year = propYear !== undefined && propYear !== null ? propYear : '';
 
   const [expanded, setExpanded] = useState(false);
   const [unitName, setUnitName] = useState('TRƯỜNG TIỂU HỌC BÌNH KHÁNH');
@@ -179,7 +179,7 @@ export default function Header({
             <Button
               variant="outlined"
               size="small"
-              startIcon={expanded ? <ExpandLess /> : <EditOutlined />}
+              startIcon={expanded ? <ExpandLess /> : <ExpandMore />}
               onClick={() => setExpanded((prev) => !prev)}
               sx={{
                 flexShrink: 0,
@@ -189,7 +189,7 @@ export default function Header({
                 whiteSpace: 'nowrap',
               }}
             >
-              {expanded ? 'Thu gọn' : 'Chỉnh sửa'}
+              {expanded ? 'Thu gọn' : 'Mở rộng'}
             </Button>
           </Box>
         </Paper>
@@ -360,13 +360,21 @@ export default function Header({
                     fontSize: '0.85rem',
                     fontWeight: 700,
                   },
-                  '& .MuiSelect-select': { py: 0.7, px: 1 },
+                  // 🎯 Thêm căn giữa cho phần nội dung hiển thị bên trong select
+                  '& .MuiSelect-select': { 
+                    py: 0.7, 
+                    px: 1, 
+                    textAlign: 'center', 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center' 
+                  },
                 }}
               >
-                <MenuItem value="1" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>QUÝ 1</MenuItem>
-                <MenuItem value="2" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>QUÝ 2</MenuItem>
-                <MenuItem value="3" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>QUÝ 3</MenuItem>
-                <MenuItem value="4" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>QUÝ 4</MenuItem>
+                <MenuItem value="1" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 1</MenuItem>
+                <MenuItem value="2" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 2</MenuItem>
+                <MenuItem value="3" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 3</MenuItem>
+                <MenuItem value="4" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 4</MenuItem>
               </TextField>
 
               <Typography
@@ -395,11 +403,19 @@ export default function Header({
                     fontSize: '0.85rem',
                     fontWeight: 700,
                   },
-                  '& .MuiSelect-select': { py: 0.7, px: 1 },
+                  // 🎯 Thêm căn giữa cho phần nội dung hiển thị bên trong select
+                  '& .MuiSelect-select': { 
+                    py: 0.7, 
+                    px: 1, 
+                    textAlign: 'center', 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center' 
+                  },
                 }}
               >
                 {YEARS.map((y) => (
-                  <MenuItem key={y} value={String(y)} sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                  <MenuItem key={y} value={String(y)} sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>
                     {y}
                   </MenuItem>
                 ))}

@@ -36,12 +36,12 @@ export default forwardRef(function SelfEvaluation({
   onNavigateCatalog,
   groupBScore = 0,
   taskStats: propTaskStats = {},
-  quarter,       // <--- Thêm dòng này
-  year,          // <--- Thêm dòng này
-  teacherName,   // <--- Thêm dòng này
-  onQuarterChange, // <--- Thêm dòng này
-  onYearChange,    // <--- Thêm dòng này
-  onTeacherNameChange, // <--- Thêm dòng này
+  quarter,       
+  year,          
+  teacherName,   
+  onQuarterChange, 
+  onYearChange,    
+  onTeacherNameChange, 
 }, ref) {
   const { selfEvaluationCache, setSelfEvaluationCache } = useTaskCatalog();
   const [criteriaA, setCriteriaA] = useState({});
@@ -173,7 +173,7 @@ export default forwardRef(function SelfEvaluation({
     };
   }, [headerData?.year, headerData?.quarter, headerData?.personalInfo, groupBScore]);
 
-  // 2. Đưa logic lưu ra thành một hàm riêng để có thể gọi từ ref hoặc nút bấm
+  // Logic lưu bản tự đánh giá
   const handleSaveEvaluation = async () => {
     try {
       const teacherId = headerData?.personalInfo
@@ -200,7 +200,7 @@ export default forwardRef(function SelfEvaluation({
         groupBScore: normalizedGroupBScore,
         totalScore,
         classification,
-        taskStats: activeTaskStats, // Đảm bảo lưu đúng taskStats thực tế
+        taskStats: activeTaskStats,
       };
 
       await saveSelfEvaluation({
@@ -232,9 +232,18 @@ export default forwardRef(function SelfEvaluation({
     }
   };
 
-  // 3. Cho phép component cha (App.js) gọi hàm handleSaveEvaluation thông qua ref
   useImperativeHandle(ref, () => ({
-    save: handleSaveEvaluation
+    save: handleSaveEvaluation,
+    getCurrentData: () => ({
+      criteriaGroups,
+      achievedScores,
+      criteriaA,
+      groupAScore,
+      normalizedGroupBScore,
+      totalScore,
+      classification,
+      comment
+    })
   }));
 
   const headerCellSx = {
@@ -327,7 +336,7 @@ export default forwardRef(function SelfEvaluation({
           <Checkbox
             size="small"
             color="error"
-            checked={!criteriaA[item.id]}
+            checked={Boolean(criteriaA[item.id] === false)}
             onChange={() => handleCheckboxChange(item.id)}
           />
         </TableCell>
@@ -340,7 +349,7 @@ export default forwardRef(function SelfEvaluation({
           <TextField
             type="number"
             size="small"
-            value={achievedScores[item.id] ?? 0}
+            value={achievedScores[item.id] ?? max}
             onChange={(e) =>
               handleScoreChange(item.id, e.target.value, max)
             }
@@ -378,23 +387,18 @@ export default forwardRef(function SelfEvaluation({
 
     const cacheKey = `${year}_Q${quarter}_${teacherId}`;
 
-    const applyData = (data) => {
-      setCriteriaGroups(data.criteriaGroups ?? []);
-      setCriteriaA(data.selfEvaluation?.criteriaA ?? {});
-      setAchievedScores(data.selfEvaluation?.achievedScores ?? {});
-      setComment(data.selfEvaluation?.comment ?? '');
-      // Khôi phục taskStats từ dữ liệu đã lưu nếu có
-      if (data.taskStats) {
-        setSavedTaskStats(data.taskStats);
-      }
-    };
-
     const loadData = async () => {
       try {
         const cachedData = selfEvaluationCache[cacheKey];
 
         if (cachedData) {
-          applyData(cachedData);
+          setCriteriaGroups(cachedData.criteriaGroups ?? []);
+          setCriteriaA(cachedData.selfEvaluation?.criteriaA ?? {});
+          setAchievedScores(cachedData.selfEvaluation?.achievedScores ?? {});
+          setComment(cachedData.selfEvaluation?.comment ?? '');
+          if (cachedData.taskStats) {
+            setSavedTaskStats(cachedData.taskStats);
+          }
           return;
         }
 
@@ -412,11 +416,35 @@ export default forwardRef(function SelfEvaluation({
             [cacheKey]: data,
           }));
 
-          applyData(data);
+          setCriteriaGroups(data.criteriaGroups ?? []);
+          setCriteriaA(data.selfEvaluation?.criteriaA ?? {});
+          setAchievedScores(data.selfEvaluation?.achievedScores ?? {});
+          setComment(data.selfEvaluation?.comment ?? '');
+          if (data.taskStats) {
+            setSavedTaskStats(data.taskStats);
+          }
         } else {
-          setCriteriaGroups([]);
-          setCriteriaA({});
-          setAchievedScores({});
+          // Chưa có dữ liệu quý này: Lấy danh sách tiêu chí mẫu từ cache quý khác
+          const existingCacheKeys = Object.keys(selfEvaluationCache);
+          let sampleCriteria = [];
+          if (existingCacheKeys.length > 0) {
+            sampleCriteria = selfEvaluationCache[existingCacheKeys[0]]?.criteriaGroups ?? [];
+          }
+
+          // Tự động thiết lập mặc định: Tất cả Đảm bảo (true) và Điểm đạt = Điểm tối đa (max)
+          const defaultCriteriaA = {};
+          const defaultAchievedScores = {};
+
+          sampleCriteria.forEach((group) => {
+            group.items?.forEach((item) => {
+              defaultCriteriaA[item.id] = true;
+              defaultAchievedScores[item.id] = item.max ?? 2;
+            });
+          });
+
+          setCriteriaGroups(sampleCriteria);
+          setCriteriaA(defaultCriteriaA);
+          setAchievedScores(defaultAchievedScores);
           setComment('');
           setSavedTaskStats(null);
         }
@@ -700,7 +728,7 @@ export default forwardRef(function SelfEvaluation({
           </TableContainer>
         </Box>
 
-        {/* --- NHÓM B & TỔNG ĐIỂM TÍCH HỢP GỌN GÀNG --- */}
+        {/* NHÓM B & TỔNG ĐIỂM */}
         <Box sx={{ mb: 3 }}>
           <Box
             sx={{
@@ -783,7 +811,7 @@ export default forwardRef(function SelfEvaluation({
           </TableContainer>
         </Box>
 
-        {/* --- XẾP LOẠI (THIẾT KẾ GỌN NGANG, ĐẦY ĐỦ SỐ LIỆU) --- */}
+        {/* XẾP LOẠI */}
         <Box sx={{ mb: 3 }}>
           <Typography
             sx={{
@@ -956,7 +984,7 @@ export default forwardRef(function SelfEvaluation({
         </Box>
       </Paper>
 
-      {/* Snackbar thông báo trạng thái */}
+      {/* Snackbar thông báo */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

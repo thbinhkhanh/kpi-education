@@ -1,12 +1,27 @@
-import React, { createContext, useContext, useState, useMemo } from "react";
+import React, { createContext, useContext, useState, useMemo, useEffect } from "react";
 
 const TaskCatalogContext = createContext(null);
 
 export function TaskCatalogProvider({ children }) {
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('global_tasks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [headerData, setHeaderData] = useState(null);
+  
   const [selfEvaluationCache, setSelfEvaluationCache] = useState({});
-  const [taskCatalogCache, setTaskCatalogCache] = useState({});
+
+  // Khởi tạo taskCatalogCache đọc từ localStorage để không bị mất khi F5
+  const [taskCatalogCache, setTaskCatalogCache] = useState(() => {
+    const saved = localStorage.getItem('global_task_catalog_cache');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Tự động lưu taskCatalogCache vào localStorage mỗi khi có thay đổi
+  useEffect(() => {
+    localStorage.setItem('global_task_catalog_cache', JSON.stringify(taskCatalogCache));
+  }, [taskCatalogCache]);
 
   const value = useMemo(
     () => ({
@@ -20,13 +35,13 @@ export function TaskCatalogProvider({ children }) {
         setTaskCatalogCache,
     }),
     [tasks, headerData, selfEvaluationCache, taskCatalogCache]
-    );
+  );
 
-    return (
+  return (
     <TaskCatalogContext.Provider value={value}>
         {children}
     </TaskCatalogContext.Provider>
-    );
+  );
 }
 
 export function useTaskCatalog() {

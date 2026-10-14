@@ -13,28 +13,18 @@ import {
   MenuItem,
   Chip,
   Tooltip,
-  Button,
   Snackbar,
   Alert,
 } from "@mui/material";
 
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
-
-import SaveOutlined from "@mui/icons-material/SaveOutlined";
 import { saveTaskEvaluation } from "../utils/saveTaskEvaluation";
 import { useTaskCatalog } from "../contexts/TaskCatalogContext";
-
-import Drawer from "@mui/material/Drawer";
-import Divider from "@mui/material/Divider";
-import Stack from "@mui/material/Stack";
-import IconButton from "@mui/material/IconButton";
-import Close from "@mui/icons-material/Close";
-import EditOutlined from "@mui/icons-material/EditOutlined";
-import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
-import { Switch } from "@mui/material";
 import Header from "./Header";
 import { exportTaskEvaluationToExcel } from "../utils/exportTaskEvaluationToExcel";
+import TaskEvaluationDialog from "./TaskEvaluationDialog";
+import { AssignmentOutlined } from "@mui/icons-material";
 
 const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
@@ -98,11 +88,17 @@ export default forwardRef(function TaskEvaluation({
   onYearChange,          // <--- Thêm dòng này
   onTeacherNameChange,   // <--- Thêm dòng này
 }, ref) {
-  const updateTask = (id, field, value) => {
+  const updateTask = (updatedTaskOrId, field, value) => {
     onTasksChange?.((previous) =>
-      previous.map((task) =>
-        task.id === id ? { ...task, [field]: value } : task
-      )
+      previous.map((task) => {
+        // Trường hợp nhận vào một object hoàn chỉnh từ TaskEvaluationDialog (khi bấm Hoàn tất)
+        if (typeof updatedTaskOrId === "object" && updatedTaskOrId !== null) {
+          return task.id === updatedTaskOrId.id ? updatedTaskOrId : task;
+        }
+        // Trường hợp cũ (cập nhật từng trường lẻ trực tiếp trên bảng)
+        if (task.id !== updatedTaskOrId) return task;
+        return { ...task, [field]: value };
+      })
     );
   };
 
@@ -699,337 +695,23 @@ export default forwardRef(function TaskEvaluation({
           </Table>
         </TableContainer>
         
-        <Drawer
-          anchor="right"
+        <TaskEvaluationDialog
           open={Boolean(selectedTask)}
+          selectedTask={selectedTask}
+          tasks={tasks}
           onClose={handleCloseDrawer}
-          PaperProps={{
-            sx: {
-              width: { xs: "100%", sm: 600, md: 750, lg: 900 },
-              maxWidth: "100%",
-              boxSizing: "border-box",
-              display: "flex",
-              flexDirection: "column",
-              bgcolor: "#f8fafc",
-            },
-          }}
-        >
-          {selectedTask && (
-            <>
-              <Box
-                sx={{
-                  p: 2.5,
-                  color: "#fff",
-                  bgcolor: "#172554",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  flexShrink: 0,
-                }}
-              >
-                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", minWidth: 0 }}>
-                  <Box
-                    sx={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 2,
-                      bgcolor: "rgba(255,255,255,0.13)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <AssignmentOutlined />
-                  </Box>
-
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "1rem", fontWeight: 800 }}>
-                      CHI TIẾT NHIỆM VỤ
-                    </Typography>
-                    <Typography sx={{ fontSize: "0.75rem", color: "#cbd5e1", mt: 0.5 }}>
-                      STT {tasks.findIndex((t) => t.id === selectedTask.id) + 1}
-                      {" · "}Chỉnh sửa đánh giá
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <IconButton
-                  onClick={handleCloseDrawer}
-                  sx={{
-                    color: "#fff",
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
-                  }}
-                >
-                  <Close />
-                </IconButton>
-              </Box>
-
-              <Box
-                sx={{
-                  p: { xs: 2, sm: 3 },
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                  boxSizing: "border-box",
-                }}
-              >
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      STT
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={tasks.findIndex((t) => t.id === selectedTask.id) + 1}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Tên công việc
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      multiline
-                      value={selectedTask.taskName ?? ""}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Điểm chuẩn
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={formatScore(selectedTask.baseScore ?? 0)}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Hệ số độ khó (%)
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={formatScore(Number(selectedTask.difficultyFactor ?? 1) * 100)}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Điểm tối đa
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={formatScore(getMaxScore(selectedTask))}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box sx={{ width: "100%", minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Tiến độ %
-                    </Typography>
-                    <Box
-                      sx={{
-                        width: "100%",
-                        "& .MuiFormControl-root": { width: "100%" },
-                      }}
-                    >
-                      {selectField(
-                        selectedTask,
-                        "progressPercent",
-                        getDefaultProgress(selectedTask),
-                        PROGRESS_OPTIONS,
-                        true
-                      )}
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ width: "100%", minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Kết quả %
-                    </Typography>
-                    <Box
-                      sx={{
-                        width: "100%",
-                        "& .MuiFormControl-root": { width: "100%" },
-                      }}
-                    >
-                      {selectField(
-                        selectedTask,
-                        "resultPercent",
-                        getDefaultResult(selectedTask),
-                        RESULT_OPTIONS,
-                        true
-                      )}
-                    </Box>
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Điểm thực hiện
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={formatScore(getPerformedScore(selectedTask))}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                      Điểm thực tế
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={formatScore(getActualScore(selectedTask))}
-                      InputProps={{ readOnly: true }}
-                      sx={{
-                        ...drawerInputSx,
-                        "& .MuiInputBase-root": {
-                          ...drawerInputSx["& .MuiInputBase-root"],
-                          bgcolor: "#f1f5f9",
-                        },
-                        "& .MuiInputBase-input": {
-                          cursor: "default",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 2,
-                      p: 0.5,
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 2,
-                      bgcolor: "#fff",
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {activeTask?.exceeded ? "Có vượt mức" : "Không vượt mức"}
-                    </Typography>
-
-                    <Switch
-                      checked={Boolean(activeTask?.exceeded)}
-                      onChange={(e) => {
-                        if (!activeTask) return;
-                        updateTask(activeTask.id, "exceeded", e.target.checked);
-                      }}
-                      color="success"
-                    />
-                  </Box>
-                </Stack>
-              </Box>
-
-              <Divider />
-
-              <Box
-                sx={{
-                  p: 2,
-                  bgcolor: "#fff",
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  flexShrink: 0,
-                  boxShadow: "0 -4px 16px rgba(15,23,42,0.04)",
-                }}
-              >
-                <Button
-                  variant="contained"
-                  //startIcon={<SaveOutlined />}
-                  onClick={handleCloseDrawer}
-                  sx={{
-                    px: 3,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    bgcolor: "#15803d",
-                    "&:hover": { bgcolor: "#166534" },
-                  }}
-                >
-                  Hoàn tất
-                </Button>
-              </Box>
-            </>
-          )}
-        </Drawer>
+          updateTask={updateTask}
+          formatScore={formatScore}
+          getMaxScore={getMaxScore}
+          getDefaultProgress={getDefaultProgress}
+          getDefaultResult={getDefaultResult}
+          getPerformedScore={getPerformedScore}
+          getActualScore={getActualScore}
+          selectField={selectField}
+          PROGRESS_OPTIONS={PROGRESS_OPTIONS}
+          RESULT_OPTIONS={RESULT_OPTIONS}
+          drawerInputSx={drawerInputSx}
+        />
       </Paper>
 
       <Snackbar

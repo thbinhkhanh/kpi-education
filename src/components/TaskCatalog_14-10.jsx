@@ -18,6 +18,7 @@ import {
   InputAdornment,
   Snackbar,
   Alert,
+  Dialog,
 } from "@mui/material";
 
 import { doc, getDoc } from "firebase/firestore";
@@ -42,6 +43,8 @@ import EditOutlined from "@mui/icons-material/EditOutlined";
 
 import { importTaskCatalog } from "../utils/importTaskCatalog";
 import { exportTaskCatalogWithExcelJS } from "../utils/exportTaskCatalogExcelJS";
+
+import TaskCatalogDialog from "./TaskCatalogDialog";
 
 const UNIT_CODE = "A29.192";
 const DEFAULT_PERIOD = "(Daotao 15/08)_KPI-Q3-2026";
@@ -72,6 +75,7 @@ const getConvertedScore = (task) =>
   ) / 100;
 
 export default forwardRef(function TaskCatalog({
+  activeTab = "catalog",
   onScoreChange,
   tasks: sharedTasks,
   onTasksChange,
@@ -252,17 +256,42 @@ export default forwardRef(function TaskCatalog({
     ]);
   };
 
-  const handleUpdateTask = (id, field, value) => {
-    setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id !== id) return task;
+  const handleUpdateTask = (updatedTaskOrId, field, value) => {
+    setTasks((prev) => {
+      const updatedTasks = prev.map((task) => {
+        if (typeof updatedTaskOrId === "object" && updatedTaskOrId !== null) {
+          return task.id === updatedTaskOrId.id ? updatedTaskOrId : task;
+        }
+        if (task.id !== updatedTaskOrId) return task;
         return { ...task, [field]: value };
-      })
-    );
+      });
+
+      // Cập nhật đồng thời vào cache của Context để lưu trạng thái ngay lập tức
+      if (cacheKey) {
+        setTaskCatalogCache((prevCache) => ({
+          ...prevCache,
+          [cacheKey]: updatedTasks,
+        }));
+      }
+
+      return updatedTasks;
+    });
   };
 
   const handleDeleteTask = (id) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
+    setTasks((prev) => {
+      const updatedTasks = prev.filter((task) => task.id !== id);
+
+      // Cập nhật lại cache trong Context và localStorage ngay sau khi xóa
+      if (cacheKey) {
+        setTaskCatalogCache((prevCache) => ({
+          ...prevCache,
+          [cacheKey]: updatedTasks,
+        }));
+      }
+
+      return updatedTasks;
+    });
   };
 
   const fileInputRef = useRef(null);
@@ -273,9 +302,7 @@ export default forwardRef(function TaskCatalog({
 
     try {
       const importedTasks = await importTaskCatalog(file);
-
       setTasks(importedTasks);
-
       setSnackbar({
         open: true,
         message: `Đã nhập ${importedTasks.length} nhiệm vụ. Vui lòng lưu để cập nhật Firestore.`,
@@ -293,6 +320,7 @@ export default forwardRef(function TaskCatalog({
       event.target.value = "";
     }
   };
+
 
   const handleExportClick = () => {
     try {
@@ -435,6 +463,15 @@ export default forwardRef(function TaskCatalog({
       try {
         const importedTasks = await importTaskCatalog(file);
         setTasks(importedTasks);
+
+        // Lưu ngay vào cache để không bị useEffect ghi đè mất
+        if (cacheKey) {
+          setTaskCatalogCache((prev) => ({
+            ...prev,
+            [cacheKey]: importedTasks,
+          }));
+        }
+
         setSnackbar({
           open: true,
           message: `Đã nhập ${importedTasks.length} nhiệm vụ từ Excel. Vui lòng nhấn "Lưu trang này" để cập nhật!`,
@@ -500,6 +537,7 @@ export default forwardRef(function TaskCatalog({
         }}
       >
         <Header 
+          activeTab={activeTab}
           quarter={quarter}
           year={year}
           teacherName={teacherName}
@@ -876,333 +914,19 @@ export default forwardRef(function TaskCatalog({
             </Table>
           </TableContainer>
 
-          <Drawer
-            anchor="right"
+          <TaskCatalogDialog
             open={Boolean(selectedTask)}
+            selectedTask={selectedTask}
+            tasks={tasks}
             onClose={handleCloseDrawer}
-            PaperProps={{
-              sx: {
-                width: { xs: "100%", sm: 520, md: 600 },
-                maxWidth: "100%",
-                display: "flex",
-                flexDirection: "column",
-                bgcolor: "#f8fafc",
-              },
-            }}
-          >
-            {selectedTask && (
-              <>
-                {/* Tiêu đề cố định */}
-                <Box
-                  sx={{
-                    p: 2.5,
-                    color: "#fff",
-                    bgcolor: "#172554",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", minWidth: 0 }}>
-                    <Box
-                      sx={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 2,
-                        bgcolor: "rgba(255,255,255,0.13)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <AssignmentOutlined />
-                    </Box>
-
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: "1rem", fontWeight: 800 }}>
-                        CHI TIẾT NHIỆM VỤ
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "0.75rem",
-                          color: "#cbd5e1",
-                          mt: 0.5,
-                        }}
-                      >
-                        STT {tasks.findIndex(t => t.id === selectedTask.id) + 1}
-                        {" · "}Chỉnh sửa thông tin
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <IconButton
-                    onClick={handleCloseDrawer}
-                    sx={{
-                      color: "#fff",
-                      "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
-                    }}
-                  >
-                    <Close />
-                  </IconButton>
-                </Box>
-
-                {/* Nội dung cuộn dọc */}
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 3 },
-                    flex: 1,
-                    overflowY: "auto",
-                  }}
-                >
-                  <Box
-                    sx={{
-                      p: 2,
-                      mb: 2.5,
-                      bgcolor: "#eff6ff",
-                      border: "1px solid #bfdbfe",
-                      borderRadius: 2,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 2,
-                    }}
-                  >
-                    <Box>
-                      <Typography sx={{ fontSize: "0.75rem", color: "#64748b" }}>
-                        ĐIỂM QUY ĐỔI TỐI ĐA
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: "1.65rem",
-                          fontWeight: 800,
-                          color: "#1d4ed8",
-                        }}
-                      >
-                        {getConvertedScore(selectedTask).toLocaleString("vi-VN", {
-                          maximumFractionDigits: 2,
-                        })}
-                      </Typography>
-                    </Box>
-
-                    <Chip
-                      label={selectedTask.status || "Chờ duyệt"}
-                      sx={{
-                        ...getStatusStyle(selectedTask.status),
-                        fontWeight: 700,
-                        height: "auto",
-                        "& .MuiChip-label": {
-                          whiteSpace: "normal",
-                          py: 0.75,
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Typography sx={{ fontSize: "0.85rem", fontWeight: 800, mb: 1.5 }}>
-                    01. THÔNG TIN CÔNG VIỆC
-                  </Typography>
-
-                  <Stack spacing={2}>
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Mã đơn vị *
-                      </Typography>
-                      {renderText(selectedTask, "unitCode", UNIT_CODE)}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Mã công việc
-                      </Typography>
-                      {renderText(selectedTask, "taskCode", "Nhập mã công việc")}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Tên công việc *
-                      </Typography>
-                      {renderText(selectedTask, "taskName", "Nhập tên công việc", 0, {
-                        multiline: true,
-                        minRows: 2,
-                      })}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Kết quả đầu ra *
-                      </Typography>
-                      {renderText(selectedTask, "output", "Mô tả kết quả đầu ra", 0, {
-                        multiline: true,
-                        minRows: 3,
-                      })}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Thời hạn hoàn thành *
-                      </Typography>
-                      {renderText(selectedTask, "deadline", "Nhập ngày / thời hạn")}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Loại công việc *
-                      </Typography>
-                      {renderSelect(selectedTask, "type", TYPES)}
-                    </Box>
-
-                    <Divider />
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Điểm chuẩn *
-                      </Typography>
-                      {renderText(selectedTask, "baseScore", "Nhập điểm chuẩn", 0, {
-                        type: "number",
-                      })}
-                    </Box>
-
-                    {/* Ô NHẬP HỆ SỐ ĐỘ KHÓ ĐÃ ĐƯỢC SỬA LẠI CHUẨN XÁC */}
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Hệ số độ khó (%) *
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        type="number"
-                        value={
-                          selectedTask.difficultyFactor === "" || selectedTask.difficultyFactor === undefined
-                            ? ""
-                            : Math.round(Number(selectedTask.difficultyFactor) * 100)
-                        }
-                        onChange={(event) => {
-                          const val = event.target.value;
-                          if (val === "") {
-                            handleUpdateTask(selectedTask.id, "difficultyFactor", "");
-                          } else {
-                            handleUpdateTask(selectedTask.id, "difficultyFactor", Number(val) / 100);
-                          }
-                        }}
-                        inputProps={{ min: 0, step: 1 }}
-                        placeholder="Nhập hệ số (VD: 100)"
-                        sx={inputSx}
-                      />
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Điểm quy đổi tối đa
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={(
-                          Number(selectedTask.baseScore || 0) *
-                          Number(selectedTask.difficultyFactor || 0)
-                        ).toFixed(2)}
-                        InputProps={{ readOnly: true }}
-                      />
-                    </Box>
-
-                    <Divider />
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Trục nhiệm vụ
-                      </Typography>
-                      {renderSelect(selectedTask, "axis", AXES)}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Trạng thái
-                      </Typography>
-                      {renderSelect(selectedTask, "status", STATUSES)}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Kỳ đánh giá
-                      </Typography>
-                      {renderText(selectedTask, "period", "Nhập kỳ đánh giá")}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Minh chứng
-                      </Typography>
-                      {renderText(selectedTask, "evidence", "Nhập minh chứng", 0, {
-                        multiline: true,
-                        minRows: 2,
-                      })}
-                    </Box>
-
-                    <Box>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 0.75 }}>
-                        Ghi chú
-                      </Typography>
-                      {renderText(selectedTask, "note", "Nhập ghi chú", 0, {
-                        multiline: true,
-                        minRows: 2,
-                      })}
-                    </Box>
-                  </Stack>
-                </Box>
-
-                {/* Thanh thao tác cố định */}
-                <Divider />
-
-                <Box
-                  sx={{
-                    p: 2,
-                    bgcolor: "#fff",
-                    display: "flex",
-                    gap: 1.5,
-                    justifyContent: "space-between",
-                    flexShrink: 0,
-                    boxShadow: "0 -4px 16px rgba(15,23,42,0.04)",
-                  }}
-                >
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<Delete />}
-                    onClick={() => {
-                      handleDeleteTask(selectedTask.id);
-                      handleCloseDrawer();
-                    }}
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 700,
-                      borderRadius: 2,
-                    }}
-                  >
-                    Xóa nhiệm vụ
-                  </Button>
-
-                  <Button
-                    variant="contained"
-                    //startIcon={<SaveOutlined />}
-                    onClick={handleCloseDrawer}
-                    sx={{
-                      px: 3,
-                      textTransform: "none",
-                      fontWeight: 700,
-                      borderRadius: 2,
-                      bgcolor: "#15803d",
-                      "&:hover": { bgcolor: "#166534" },
-                    }}
-                  >
-                    Hoàn tất
-                  </Button>
-                </Box>
-              </>
-            )}
-          </Drawer>
+            onSaveTask={handleUpdateTask} // <--- Đổi từ onUpdateTask thành onSaveTask ở đây
+            onDeleteTask={handleDeleteTask}
+            UNIT_CODE={UNIT_CODE}
+            TYPES={TYPES}
+            AXES={AXES}
+            STATUSES={STATUSES}
+            inputSx={inputSx}
+          />
         </Box>
       </Paper>
       
