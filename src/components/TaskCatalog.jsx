@@ -122,20 +122,30 @@ export default forwardRef(function TaskCatalog({
 
   useEffect(() => {
     if (!cacheKey) return;
-    // Nếu đang trong quá trình import file từ máy tính thì bỏ qua useEffect này để không bị mất dữ liệu
     if (isImportingRef.current) return;
 
     let cancelled = false;
 
     const loadTasks = async () => {
       try {
-        // Nếu Context đã có dữ liệu và chưa load cho key này thì dùng luôn cache
+        const cachedData = taskCatalogCache[cacheKey];
+        
+        // 🎯 Xử lý an toàn: Nếu cache là object (do Trang 3 ghi đè cấu trúc mới), ta lấy phần tasks bên trong, nếu là mảng thì dùng luôn
+        let cachedTasks = null;
+        if (cachedData) {
+          if (Array.isArray(cachedData)) {
+            cachedTasks = cachedData;
+          } else if (cachedData.tasks && Array.isArray(cachedData.tasks)) {
+            cachedTasks = cachedData.tasks;
+          }
+        }
+
         if (
-          Object.prototype.hasOwnProperty.call(taskCatalogCache, cacheKey) &&
+          cachedTasks &&
           loadedKeyRef.current !== cacheKey
         ) {
           if (!cancelled) {
-            setTasks(taskCatalogCache[cacheKey]);
+            setTasks(cachedTasks);
             loadedKeyRef.current = cacheKey;
           }
           return;
@@ -178,8 +188,14 @@ export default forwardRef(function TaskCatalog({
 
   const finalGroupBScore = Math.min(70, Math.max(0, totalScore));
 
+  // 🎯 Chỉ gửi điểm quy đổi từ danh mục lên component cha (App.js) khi người dùng thực sự thay đổi dữ liệu bảng ở trang 3, 
+  // dùng một ref để tránh trigger liên tục hoặc bị ghi đè không mong muốn từ trang 2.
+  const prevScoreRef = useRef(finalGroupBScore);
   useEffect(() => {
-    onScoreChange?.(finalGroupBScore);
+    if (prevScoreRef.current !== finalGroupBScore) {
+      prevScoreRef.current = finalGroupBScore;
+      onScoreChange?.(finalGroupBScore);
+    }
   }, [finalGroupBScore, onScoreChange]);
 
   const submittedCount = tasks.filter(

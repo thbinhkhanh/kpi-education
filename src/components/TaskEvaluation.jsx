@@ -402,7 +402,7 @@ export default forwardRef(function TaskEvaluation({
     },
   };
 
-  return (
+return (
     <Box
       sx={{
         width: '100%',

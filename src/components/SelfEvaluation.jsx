@@ -99,11 +99,11 @@ export default forwardRef(function SelfEvaluation({
       .reduce((sum, score) => sum + (Number(score) || 0), 0)
       .toFixed(2)
   );
-
-  // Xác định điểm nhóm B: nếu prop groupBScore = 0 thì dùng điểm dự phòng từ Firestore
-  const effectiveGroupBScore = Number(groupBScore) === 0 && fallbackGroupBScore !== null 
-    ? fallbackGroupBScore 
-    : groupBScore;
+  
+  const effectiveGroupBScore =
+    fallbackGroupBScore !== null
+      ? fallbackGroupBScore
+      : Number(groupBScore) || 0;
 
   const normalizedGroupBScore = Math.min(
     70,
@@ -113,17 +113,24 @@ export default forwardRef(function SelfEvaluation({
   const totalScore = Number(
     (groupAScore + normalizedGroupBScore).toFixed(2)
   );
+    
+  const hasValidPropStats =
+    Number(propTaskStats?.totalTasks) > 0;
 
-  // Sử dụng taskStats lấy từ dữ liệu đã lưu hoặc từ props truyền vào
-  const activeTaskStats = (savedTaskStats && Object.keys(savedTaskStats).length > 0) 
-    ? savedTaskStats 
-    : propTaskStats;
+  const activeTaskStats = hasValidPropStats
+    ? propTaskStats
+    : (savedTaskStats || propTaskStats || {});
 
   const totalTasks = Number(activeTaskStats.totalTasks) || 0;
-  const completedTasks = Number(activeTaskStats.completedTasks) || 0;
-  const exceededTasks = Number(activeTaskStats.exceededTasks) || 0;
+  const completedTasks =
+    Number(activeTaskStats.completedTasks) || 0;
+  const exceededTasks = Number(
+    activeTaskStats.exceededTasks ??
+    activeTaskStats.exceeded ??
+    0
+  );
 
-  const meetsExcellentCriteria =
+   const meetsExcellentCriteria =
     totalTasks > 0 &&
     completedTasks === totalTasks &&
     exceededTasks >= Math.ceil(totalTasks * 0.3);
@@ -149,37 +156,102 @@ export default forwardRef(function SelfEvaluation({
     const year = headerData?.year;
     const quarter = headerData?.quarter;
     const teacherId = headerData?.personalInfo
-      ?.find((item) => item.label?.trim() === 'Họ và tên')
+      ?.find((item) => item.label?.trim() === "Họ và tên")
       ?.value?.trim();
-
-    // 🎯 Khi đổi kỳ mà thiếu thông tin, reset ngay điểm dự phòng về 0
-    if (!year || !quarter || !teacherId) {
-      setFallbackGroupBScore(0);
-      return;
-    }
 
     let cancelled = false;
 
     const fetchTaskEvaluationScore = async () => {
+      if (!year || !quarter || !teacherId) {
+        setFallbackGroupBScore(0);
+        setSavedTaskStats({
+          totalTasks: 0,
+          completedTasks: 0,
+          exceededTasks: 0,
+        });
+        return;
+      }
+
+      // Tránh hiển thị dữ liệu của kỳ trước trong lúc tải kỳ mới
+      setFallbackGroupBScore(null);
+
       try {
-        const cacheKey = `${String(year)}_Q${String(quarter)}_${teacherId}`;
-        const snapshot = await getDoc(doc(db, "KPI_TASK_EVALUATION", cacheKey));
+        const cacheKey =
+          `${String(year)}_Q${String(quarter)}_${teacherId}`;
+
+        const snapshot = await getDoc(
+          doc(db, "KPI_TASK_EVALUATION", cacheKey)
+        );
 
         if (cancelled) return;
 
-        if (snapshot.exists()) {
-          const evalData = snapshot.data();
-          const score = evalData.totalScore ?? evalData.groupBScore ?? 0;
-          setFallbackGroupBScore(Number(score));
-        } else {
-          // 🎯 Nếu không tồn tại dữ liệu trên Firestore cho kỳ này, ép về 0 tuyệt đối không dùng cache cũ
+        if (!snapshot.exists()) {
           setFallbackGroupBScore(0);
+          setSavedTaskStats({
+            totalTasks: 0,
+            completedTasks: 0,
+            exceededTasks: 0,
+          });
+          return;
         }
+
+        const evalData = snapshot.data();
+
+        // totalScore trong KPI_TASK_EVALUATION là điểm KPI nhóm B.
+        // Ví dụ: totalScore = 66 => hiển thị 66/70.
+        const scoreB = Number(evalData.totalScore) || 0;
+
+        setFallbackGroupBScore(
+          Math.min(70, Math.max(0, scoreB))
+        );
+
+        // Thống kê trực tiếp từ danh sách nhiệm vụ đã lưu
+        const tasks = Array.isArray(evalData.tasks)
+          ? evalData.tasks
+          : [];
+
+        const completedTasks = tasks.filter(
+          (task) =>
+            task.status === "Đã duyệt" ||
+            task.status === "Đã nộp minh chứng" ||
+            (
+              task.status === "Hoạt động" &&
+              Number(task.progressPercent) === 100 &&
+              Number(task.resultPercent) === 100
+            )
+        ).length;
+
+        const exceededTasks = tasks.filter(
+          (task) =>
+            task.exceedsTarget === true ||
+            task.exceeded === true
+        ).length;
+
+        setSavedTaskStats({
+          totalTasks: tasks.length,
+          completedTasks,
+          exceededTasks,
+        });
       } catch (error) {
-        if (!cancelled) {
-          console.error("Lỗi lấy dữ liệu từ KPI_TASK_EVALUATION:", error);
-          setFallbackGroupBScore(0);
-        }
+        if (cancelled) return;
+
+        console.error(
+          "Lỗi lấy dữ liệu từ KPI_TASK_EVALUATION:",
+          error
+        );
+
+        setFallbackGroupBScore(0);
+        setSavedTaskStats({
+          totalTasks: 0,
+          completedTasks: 0,
+          exceededTasks: 0,
+        });
+
+        setSnackbar({
+          open: true,
+          message: "Không tải được kết quả đánh giá KPI từ Firestore!",
+          severity: "error",
+        });
       }
     };
 
@@ -188,7 +260,12 @@ export default forwardRef(function SelfEvaluation({
     return () => {
       cancelled = true;
     };
-  }, [headerData?.year, headerData?.quarter, headerData?.personalInfo]);
+  }, [
+    headerData?.year,
+    headerData?.quarter,
+    headerData?.personalInfo,
+  ]);
+
 
   // Logic lưu bản tự đánh giá
   const handleSaveEvaluation = async () => {
@@ -422,9 +499,7 @@ export default forwardRef(function SelfEvaluation({
           }
 
           setComment(cachedData.selfEvaluation?.comment ?? '');
-          if (cachedData.taskStats) {
-            setSavedTaskStats(cachedData.taskStats);
-          }
+          
           return;
         }
 
@@ -453,9 +528,7 @@ export default forwardRef(function SelfEvaluation({
           }
 
           setComment(data.selfEvaluation?.comment ?? '');
-          if (data.taskStats) {
-            setSavedTaskStats(data.taskStats);
-          }
+          
         } else {
           // 🎯 Nếu hoàn toàn chưa có trên Firestore/Cache, giữ nguyên giá trị khởi tạo mặc định (tính sẵn điểm tối đa từ giao diện)
           setCriteriaGroups(getEvaluationCriteriaGroups());
