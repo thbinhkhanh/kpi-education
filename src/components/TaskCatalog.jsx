@@ -135,20 +135,22 @@ export default forwardRef(function TaskCatalog({
 
     let cancelled = false;
 
-    // Nếu Context đã có dữ liệu thì hiển thị ngay
-    if (Object.prototype.hasOwnProperty.call(taskCatalogCache, cacheKey)) {
-        setTasks(taskCatalogCache[cacheKey]);
-        loadedKeyRef.current = cacheKey;
-        return;
-    }
-
-    // Tránh tải lại cùng một khóa
-    if (loadedKeyRef.current === cacheKey) return;
-
     const loadTasks = async () => {
-        try {
+      try {
+        // 1. Nếu đã có trong Context Cache và chưa ép tải lại thì dùng luôn
+        if (
+          !cancelled &&
+          loadedKeyRef.current !== cacheKey &&
+          Object.prototype.hasOwnProperty.call(taskCatalogCache, cacheKey)
+        ) {
+          setTasks(taskCatalogCache[cacheKey]);
+          loadedKeyRef.current = cacheKey;
+          return;
+        }
+
+        // 2. Luôn gọi fetch từ Firestore để đảm bảo lấy dữ liệu mới nhất trên thiết bị di động
         const snapshot = await getDoc(
-            doc(db, "KPI_TASK_CATALOG", cacheKey)
+          doc(db, "KPI_TASK_CATALOG", cacheKey)
         );
 
         if (cancelled) return;
@@ -158,29 +160,24 @@ export default forwardRef(function TaskCatalog({
 
         setTasks(loadedTasks);
         setTaskCatalogCache((prev) => ({
-            ...prev,
-            [cacheKey]: loadedTasks,
+          ...prev,
+          [cacheKey]: loadedTasks,
         }));
 
         loadedKeyRef.current = cacheKey;
-        } catch (error) {
+      } catch (error) {
         if (!cancelled) {
-            console.error("Lỗi tải danh mục nhiệm vụ:", error);
+          console.error("Lỗi tải danh mục nhiệm vụ:", error);
         }
-        }
+      }
     };
 
     loadTasks();
 
     return () => {
-        cancelled = true;
+      cancelled = true;
     };
-    }, [
-    cacheKey,
-    taskCatalogCache[cacheKey],
-    setTasks,
-    setTaskCatalogCache,
-    ]);
+  }, [cacheKey, setTasks, setTaskCatalogCache]);
 
   const totalScore = tasks.reduce(
     (sum, task) => sum + getConvertedScore(task),
