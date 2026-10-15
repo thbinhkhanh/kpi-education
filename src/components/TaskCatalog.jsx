@@ -11,41 +11,27 @@ import {
   TableRow,
   Button,
   Chip,
-  Stack,
   TextField,
   MenuItem,
-  IconButton,
-  InputAdornment,
   Snackbar,
   Alert,
-  Dialog,
 } from "@mui/material";
 
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
-
 import Add from "@mui/icons-material/Add";
 import Delete from "@mui/icons-material/Delete";
-import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
-import HourglassEmpty from "@mui/icons-material/HourglassEmpty";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
-import TrendingUp from "@mui/icons-material/TrendingUp";
 import Header from "./Header";
-
-import SaveOutlined from "@mui/icons-material/SaveOutlined";
 import { saveTaskCatalog } from "../utils/saveTaskCatalog";
 import { useTaskCatalog } from "../contexts/TaskCatalogContext";
-
-import Drawer from "@mui/material/Drawer";
-import Divider from "@mui/material/Divider";
-import Close from "@mui/icons-material/Close";
 import EditOutlined from "@mui/icons-material/EditOutlined";
-
 import { importTaskCatalog } from "../utils/importTaskCatalog";
 import { exportTaskCatalogWithExcelJS } from "../utils/exportTaskCatalogExcelJS";
-
 import TaskCatalogDialog from "./TaskCatalogDialog";
 import TaskAddDialog from "./TaskAddDialog";
+import TaskDeleteDialog from "./TaskDeleteDialog";
+
 
 const UNIT_CODE = "H29.233.11";
 const DEFAULT_PERIOD = "(Daotao 15/08)_KPI-Q3-2026";
@@ -103,6 +89,9 @@ export default forwardRef(function TaskCatalog({
 
   // Thêm state này vào danh sách useState
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  // State quản lý hộp thoại cảnh báo xóa
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   const selectedTask = tasks.find(
     (task) => task.id === selectedTaskId
@@ -129,29 +118,32 @@ export default forwardRef(function TaskCatalog({
         : "";
 
   const loadedKeyRef = useRef("");
+  const isImportingRef = useRef(false); // Thêm cờ chống ghi đè khi import file
 
   useEffect(() => {
     if (!cacheKey) return;
+    // Nếu đang trong quá trình import file từ máy tính thì bỏ qua useEffect này để không bị mất dữ liệu
+    if (isImportingRef.current) return;
 
     let cancelled = false;
 
     const loadTasks = async () => {
       try {
-        // 1. Nếu đã có trong Context Cache và chưa ép tải lại thì dùng luôn
+        // Nếu Context đã có dữ liệu và chưa load cho key này thì dùng luôn cache
         if (
-          !cancelled &&
-          loadedKeyRef.current !== cacheKey &&
-          Object.prototype.hasOwnProperty.call(taskCatalogCache, cacheKey)
+          Object.prototype.hasOwnProperty.call(taskCatalogCache, cacheKey) &&
+          loadedKeyRef.current !== cacheKey
         ) {
-          setTasks(taskCatalogCache[cacheKey]);
-          loadedKeyRef.current = cacheKey;
+          if (!cancelled) {
+            setTasks(taskCatalogCache[cacheKey]);
+            loadedKeyRef.current = cacheKey;
+          }
           return;
         }
 
-        // 2. Luôn gọi fetch từ Firestore để đảm bảo lấy dữ liệu mới nhất trên thiết bị di động
-        const snapshot = await getDoc(
-          doc(db, "KPI_TASK_CATALOG", cacheKey)
-        );
+        if (loadedKeyRef.current === cacheKey) return;
+
+        const snapshot = await getDoc(doc(db, "KPI_TASK_CATALOG", cacheKey));
 
         if (cancelled) return;
 
@@ -177,7 +169,7 @@ export default forwardRef(function TaskCatalog({
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, setTasks, setTaskCatalogCache]);
+  }, [cacheKey, taskCatalogCache, setTasks, setTaskCatalogCache]);
 
   const totalScore = tasks.reduce(
     (sum, task) => sum + getConvertedScore(task),
@@ -761,7 +753,14 @@ export default forwardRef(function TaskCatalog({
 
                     <TableCell sx={bodyCellSx}>
                       <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                        {/* Icon Xóa nhiệm vụ */}
                         <Box
+                          component="span"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Ngăn mở Drawer chỉnh sửa
+                            setTaskToDelete(task); // Lưu lại toàn bộ thông tin nhiệm vụ để hiển thị tên lên Dialog
+                          }}
+                          title="Xóa nhiệm vụ"
                           sx={{
                             width: 34,
                             height: 34,
@@ -770,11 +769,16 @@ export default forwardRef(function TaskCatalog({
                             alignItems: "center",
                             justifyContent: "center",
                             borderRadius: 1.5,
-                            bgcolor: "#dbeafe",
-                            color: "#1d4ed8",
+                            bgcolor: "#fee2e2",
+                            color: "#dc2626",
+                            cursor: "pointer",
+                            transition: "background-color 0.2s",
+                            "&:hover": {
+                              bgcolor: "#fecaca",
+                            },
                           }}
                         >
-                          <AssignmentOutlined fontSize="small" />
+                          <Delete fontSize="small" />
                         </Box>
 
                         <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -1012,6 +1016,22 @@ export default forwardRef(function TaskCatalog({
             inputSx={inputSx}
           />
         </Box>
+
+        {/* Dialog Cảnh báo xác nhận xóa */}
+        <TaskDeleteDialog
+          open={Boolean(taskToDelete)}
+          taskName={taskToDelete?.taskName}
+          onClose={() => setTaskToDelete(null)}
+          onConfirm={() => {
+            handleDeleteTask(taskToDelete.id);
+            setTaskToDelete(null);
+            setSnackbar({
+              open: true,
+              message: "Đã xóa nhiệm vụ thành công!",
+              severity: "success",
+            });
+          }}
+        />
       </Paper>
       
       {/* Snackbar thông báo */}

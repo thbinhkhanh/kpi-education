@@ -24,6 +24,12 @@ import { getSelfEvaluation } from '../utils/saveSelfEvaluation';
 import { useTaskCatalog } from '../contexts/TaskCatalogContext';
 import { Check, AssignmentOutlined } from '@mui/icons-material';
 
+import { 
+  getEvaluationCriteriaGroups, 
+  getDefaultCriteriaA, 
+  getDefaultAchievedScores 
+} from '../utils/evaluationUtils';
+
 
 // Hàm làm tròn thông minh: tối đa 1 số lẻ, nếu phần thập phân là 0 thì bỏ
 const formatScore = (value) => {
@@ -45,16 +51,17 @@ export default forwardRef(function SelfEvaluation({
   onTeacherNameChange, 
 }, ref) {
   const { selfEvaluationCache, setSelfEvaluationCache } = useTaskCatalog();
-  const [criteriaA, setCriteriaA] = useState({});
-  const [achievedScores, setAchievedScores] = useState({});
+  const [criteriaA, setCriteriaA] = useState(getDefaultCriteriaA);
+  const [achievedScores, setAchievedScores] = useState(getDefaultAchievedScores);
   const [comment, setComment] = useState('');
 
-  const [criteriaGroups, setCriteriaGroups] = useState([]);
+  const [criteriaGroups, setCriteriaGroups] = useState(getEvaluationCriteriaGroups);
   const [criteriaLoading, setCriteriaLoading] = useState(false);
   const [fallbackGroupBScore, setFallbackGroupBScore] = useState(null);
   
   // State lưu trữ thống kê nhiệm vụ được nạp từ Firestore hoặc dùng từ props
   const [savedTaskStats, setSavedTaskStats] = useState(null);
+  
 
   // Khai báo state quản lý Snackbar
   const [snackbar, setSnackbar] = useState({
@@ -383,12 +390,12 @@ export default forwardRef(function SelfEvaluation({
     );
   };
 
+  // Hiệu ứng tải dữ liệu bản tự đánh giá với cơ chế kiểm tra điểm Nhóm A
   useEffect(() => {
     let cancelled = false;
 
     const year = headerData?.year;
     const quarter = headerData?.quarter;
-
     const teacherId = headerData?.personalInfo
       ?.find((item) => item.label?.trim() === 'Họ và tên')
       ?.value?.trim();
@@ -402,9 +409,18 @@ export default forwardRef(function SelfEvaluation({
         const cachedData = selfEvaluationCache[cacheKey];
 
         if (cachedData) {
-          setCriteriaGroups(cachedData.criteriaGroups ?? []);
-          setCriteriaA(cachedData.selfEvaluation?.criteriaA ?? {});
-          setAchievedScores(cachedData.selfEvaluation?.achievedScores ?? {});
+          if (cancelled) return;
+          setCriteriaGroups(cachedData.criteriaGroups ?? getEvaluationCriteriaGroups());
+          setCriteriaA(cachedData.selfEvaluation?.criteriaA ?? getDefaultCriteriaA());
+          
+          // 🎯 Kiểm tra xem dữ liệu cũ có lưu achievedScores hay không, nếu có thì dùng, nếu không thì lấy mặc định từ giao diện
+          const savedScores = cachedData.selfEvaluation?.achievedScores;
+          if (savedScores && Object.keys(savedScores).length > 0) {
+            setAchievedScores(savedScores);
+          } else {
+            setAchievedScores(getDefaultAchievedScores());
+          }
+
           setComment(cachedData.selfEvaluation?.comment ?? '');
           if (cachedData.taskStats) {
             setSavedTaskStats(cachedData.taskStats);
@@ -426,22 +442,25 @@ export default forwardRef(function SelfEvaluation({
             [cacheKey]: data,
           }));
 
-          setCriteriaGroups(data.criteriaGroups ?? []);
-          setCriteriaA(data.selfEvaluation?.criteriaA ?? {});
-          setAchievedScores(data.selfEvaluation?.achievedScores ?? {});
+          setCriteriaGroups(data.criteriaGroups ?? getEvaluationCriteriaGroups());
+          setCriteriaA(data.selfEvaluation?.criteriaA ?? getDefaultCriteriaA());
+          
+          const savedScores = data.selfEvaluation?.achievedScores;
+          if (savedScores && Object.keys(savedScores).length > 0) {
+            setAchievedScores(savedScores);
+          } else {
+            setAchievedScores(getDefaultAchievedScores());
+          }
+
           setComment(data.selfEvaluation?.comment ?? '');
           if (data.taskStats) {
             setSavedTaskStats(data.taskStats);
           }
         } else {
-          // 🎯 Chỉ lấy mẫu khung tiêu chí nếu thực sự có tồn tại dữ liệu từ cache của chính quý/năm đó, tránh lấy nhầm dữ liệu rỗng hoặc sai lệch từ tab khác
-          const cachedData = selfEvaluationCache[cacheKey];
-          const emptyCriteriaA = {};
-          const emptyAchievedScores = {};
-
-          setCriteriaGroups(cachedData?.criteriaGroups ?? []);
-          setCriteriaA(emptyCriteriaA);
-          setAchievedScores(emptyAchievedScores);
+          // 🎯 Nếu hoàn toàn chưa có trên Firestore/Cache, giữ nguyên giá trị khởi tạo mặc định (tính sẵn điểm tối đa từ giao diện)
+          setCriteriaGroups(getEvaluationCriteriaGroups());
+          setCriteriaA(getDefaultCriteriaA());
+          setAchievedScores(getDefaultAchievedScores());
           setComment('');
           setSavedTaskStats(null);
         }
