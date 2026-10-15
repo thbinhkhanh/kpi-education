@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 
-const UNIT_CODE = "A29.192";
-const DEFAULT_PERIOD = "(Daotao 15/08)_KPI-Q3-2026";
+const UNIT_CODE = "H29.233.11";
+const FALLBACK_PERIOD = "(Daotao 15/08)_KPI-Q3-2026";
 
 const AXES = [
   "Trục 1 - Thực hiện mục tiêu phát triển kinh tế - xã hội và nhiệm vụ chính trị được giao",
@@ -37,33 +37,23 @@ export async function importTaskCatalog(file) {
 
   const worksheet = workbook.Sheets[sheetName];
   
-  // Đọc file dưới dạng mảng các mảng (array of arrays) để lấy chính xác theo vị trí cột (index)
   const rows = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: "",
-    raw: false,
+    raw: true,
   });
 
   if (!rows.length) {
     throw new Error("File Excel không có dữ liệu.");
   }
 
-  // Lọc bỏ các dòng trống và tìm các dòng dữ liệu nhiệm vụ (bỏ qua các dòng tiêu đề ở trên)
-  // Dựa vào hình ảnh mẫu của bạn, dữ liệu nhiệm vụ bắt đầu từ các hàng có số thứ tự (1, 2, 3...) ở cột đầu tiên
-  const taskRows = rows.filter((row) => {
-    const firstCol = String(row[0] ?? "").trim();
-    // Kiểm tra xem cột đầu tiên có phải là số thứ tự (STT) hay không
-    return /^\d+$/.test(firstCol);
-  });
+  // Lấy dữ liệu bắt đầu từ dòng thứ 4 (index 3), bỏ qua 3 dòng tiêu đề
+  const taskRows = rows.slice(3).filter((row) => 
+    row.some((cell) => String(cell).trim() !== "")
+  );
 
   if (!taskRows.length) {
-    // Fallback nếu không tìm thấy STT rõ ràng, lấy từ hàng thứ 3 trở đi
-    const fallbackRows = rows.slice(2).filter((row) => 
-      row.some((cell) => String(cell).trim() !== "")
-    );
-    if (!fallbackRows.length) throw new Error("Không tìm thấy dữ liệu nhiệm vụ trong file Excel.");
-    
-    return parseRowsToTasks(fallbackRows);
+    throw new Error("Không tìm thấy dữ liệu nhiệm vụ từ dòng 4 trong file Excel.");
   }
 
   return parseRowsToTasks(taskRows);
@@ -71,41 +61,51 @@ export async function importTaskCatalog(file) {
 
 function parseRowsToTasks(taskRows) {
   return taskRows.map((row, index) => {
-    // Ánh xạ theo vị trí cột từ file Excel mẫu của bạn:
+    // Ánh xạ vị trí cột từ dòng 4 trở đi:
     // row[0]: STT
     // row[1]: Mã đơn vị
-    // row[2]: Mã công việc
-    // row[3]: Tên công việc
-    // row[4]: Kết quả đầu ra
-    // row[5]: Thời hạn hoàn thành
-    // row[6]: Loại công việc
-    // row[7]: Điểm chuẩn
-    // row[8]: Hệ số độ khó (%)
-    // row[10] hoặc các cột sau có thể là Minh chứng, Trạng thái, v.v.
+    // row[2]: Tên công việc
+    // row[3]: Kết quả đầu ra
+    // row[4]: Thời hạn hoàn thành
+    // row[5]: Loại công việc
+    // row[6]: Điểm chuẩn
+    // row[7]: Hệ số độ khó
+    // row[9]: Minh chứng
+    // row[10]: Ghi chú
+    // row[12]: Trạng thái
+    // row[13]: Kỳ đánh giá
 
-    const rawDifficulty = row[8] !== undefined && row[8] !== "" ? row[8] : "100";
-    const cleanDifficulty = String(rawDifficulty).replace("%", "").trim();
-    const difficultyNum = toNumber(cleanDifficulty, 100);
-    const difficultyFactor = difficultyNum > 1 ? difficultyNum / 100 : difficultyNum;
+    const rawDifficulty = row[7];
+    let difficultyFactor = 1;
 
-    const baseScore = toNumber(row[7], 10);
-    const typeVal = String(row[6] ?? "").trim();
+    if (rawDifficulty !== undefined && rawDifficulty !== "") {
+      const numVal = Number(rawDifficulty);
+      if (Number.isFinite(numVal)) {
+        difficultyFactor = numVal > 5 ? numVal / 100 : numVal;
+      } else {
+        const cleanDifficulty = String(rawDifficulty).replace("%", "").trim();
+        const parsed = toNumber(cleanDifficulty, 1);
+        difficultyFactor = parsed > 5 ? parsed / 100 : parsed;
+      }
+    }
+
+    const baseScore = toNumber(row[6], 10);
+    const typeVal = String(row[5] ?? "").trim();
 
     return {
       id: index + 1,
       unitCode: String(row[1] ?? "").trim() || UNIT_CODE,
-      taskCode: String(row[2] ?? "").trim(),
-      taskName: String(row[3] ?? "").trim(),
-      output: String(row[4] ?? "").trim(),
-      deadline: String(row[5] ?? "").trim(),
+      taskName: String(row[2] ?? "").trim(),
+      output: String(row[3] ?? "").trim(),
+      deadline: String(row[4] ?? "").trim(),
       type: typeVal || "Thường xuyên",
       baseScore: baseScore,
       difficultyFactor: difficultyFactor > 0 ? difficultyFactor : 1,
-      evidence: String(row[10] ?? "").trim(),
-      note: String(row[11] ?? "").trim(),
+      evidence: String(row[9] ?? "").trim(),
+      note: String(row[10] ?? "").trim(),
       axis: AXES[0],
-      status: String(row[13] ?? "").trim() || "Hoạt động",
-      period: DEFAULT_PERIOD,
+      status: String(row[12] ?? "").trim() || "Hoạt động",
+      period: String(row[13] ?? "").trim() || FALLBACK_PERIOD, // Lấy động từ cột Kỳ đánh giá
     };
   });
 }

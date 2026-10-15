@@ -47,7 +47,7 @@ import { exportTaskCatalogWithExcelJS } from "../utils/exportTaskCatalogExcelJS"
 import TaskCatalogDialog from "./TaskCatalogDialog";
 import TaskAddDialog from "./TaskAddDialog";
 
-const UNIT_CODE = "A29.192";
+const UNIT_CODE = "H29.233.11";
 const DEFAULT_PERIOD = "(Daotao 15/08)_KPI-Q3-2026";
 
 const AXES = [
@@ -244,7 +244,6 @@ export default forwardRef(function TaskCatalog({
       {
         id: Math.max(0, ...prev.map((task) => task.id)) + 1,
         unitCode: UNIT_CODE,
-        taskCode: "",
         taskName: "",
         output: "",
         deadline: "",
@@ -793,7 +792,7 @@ export default forwardRef(function TaskCatalog({
                             {task.taskName || "Chưa nhập tên nhiệm vụ"}
                           </Typography>
 
-                          <Typography
+                          {/*<Typography
                             sx={{
                               fontSize: "0.72rem",
                               color: "#94a3b8",
@@ -803,7 +802,7 @@ export default forwardRef(function TaskCatalog({
                             {task.unitCode || UNIT_CODE}
                             {" · "}
                             {task.taskCode || "Chưa có mã"}
-                          </Typography>
+                          </Typography>*/}
 
                           <Typography
                             sx={{

@@ -233,7 +233,7 @@ export default function TaskCatalogDialog({
             />
           </Box>
 
-          <Box>
+          {/*<Box>
             <Typography sx={fieldLabelSx}>Mã công việc</Typography>
             <TextField
               fullWidth
@@ -243,7 +243,7 @@ export default function TaskCatalogDialog({
               placeholder="Nhập mã công việc"
               sx={inputSx}
             />
-          </Box>
+          </Box>*/}
 
           <Box>
             <Typography sx={fieldLabelSx}>Tên công việc *</Typography>

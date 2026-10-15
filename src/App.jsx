@@ -19,12 +19,12 @@ import { TaskCatalogProvider } from "./contexts/TaskCatalogContext";
 import { Snackbar, Alert, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import { exportTaskCatalogWithExcelJS } from "./utils/exportTaskCatalogExcelJS";
 
-const UNIT_CODE = "A29.192";
+const UNIT_CODE = "H29.233.11";
 const DEFAULT_PERIOD = "(Daotao 15/08)_KPI-Q3-2026";
 
 const START_ROW = 4;
 const START_COL = 1;
-const COLUMN_COUNT = 15;
+const COLUMN_COUNT = 14;
 const CONCURRENCY = 3;
 
 const encoder = new TextEncoder();
@@ -811,8 +811,7 @@ export default function App() {
 
         return [
           index + 1,
-          task.unitCode || UNIT_CODE,
-          task.taskCode || "",
+          task.unitCode || UNIT_CODE,          
           task.taskName || "",
           task.output || "",
           task.deadline || "",
