@@ -162,18 +162,109 @@ export default function Header({
                 {currentTitle}
               </Typography>
 
-              <Typography
-                sx={{
-                  mt: 0.4,
-                  fontSize: '1rem',
-                  color: '#475569',
-                }}
-              >
-                {/*{name}*/}
-                {quarter ? ` Quý ${quarter}` : ''}
-                {year ? `/${year}` : ''}
-                {/*{date ? ` · Ngày lập ${date}` : ''}*/}
-              </Typography>
+               <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 0.75,
+                    flexWrap: 'wrap',
+                    width: '100%',
+                    position: 'relative',
+                    mt: 0.75,
+                  }}
+                >
+                  {/* Chọn Quý */}
+                  <TextField
+                    select
+                    value={quarter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (onQuarterChange) {
+                        onQuarterChange(val);
+                      }
+                    }}
+                    size="small"
+                    inputProps={{ 'aria-label': 'Quý đánh giá' }}
+                    sx={{
+                      width: 105,
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: '#eff6ff',
+                        color: '#1d4ed8',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                      },
+                      '& .MuiSelect-select': {
+                        py: 0.7,
+                        px: 1,
+                        textAlign: 'center',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      },
+                    }}
+                  >
+                    <MenuItem value="1" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 1</MenuItem>
+                    <MenuItem value="2" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 2</MenuItem>
+                    <MenuItem value="3" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 3</MenuItem>
+                    <MenuItem value="4" sx={{ fontSize: '0.85rem', fontWeight: 600, justifyContent: 'center' }}>QUÝ 4</MenuItem>
+                  </TextField>
+
+                  <Typography
+                    sx={{
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      color: '#1d4ed8',
+                    }}
+                  >
+                    Năm
+                  </Typography>
+
+                  {/* Chọn Năm */}
+                  <TextField
+                    select
+                    value={year}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (onYearChange) {
+                        onYearChange(val);
+                      }
+                    }}
+                    size="small"
+                    inputProps={{ 'aria-label': 'Năm đánh giá' }}
+                    sx={{
+                      width: 95,
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: '#eff6ff',
+                        color: '#1d4ed8',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                      },
+                      '& .MuiSelect-select': {
+                        py: 0.7,
+                        px: 1,
+                        textAlign: 'center',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      },
+                    }}
+                  >
+                    {YEARS.map((y) => (
+                      <MenuItem
+                        key={y}
+                        value={String(y)}
+                        sx={{
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {y}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
             </Box>
 
             <Button
