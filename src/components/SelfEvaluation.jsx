@@ -618,7 +618,6 @@ export default forwardRef(function SelfEvaluation({
         </Box>
 
         {/* NHÓM A */}
-        {/* NHÓM A */}
         <Box sx={{ mb: 4 }}>
           <Box
             sx={{
@@ -988,13 +987,13 @@ export default forwardRef(function SelfEvaluation({
             <Box sx={{ mb: 3 }}>
               <Typography
                 sx={{
-                  fontSize: '0.95rem',
+                  fontSize: '1.1rem',
                   fontWeight: 800,
-                  color: '#0f172a',
+                  color: '#1e3a8a',
                   mb: 1.5,
                 }}
               >
-                II. Tự đề xuất xếp loại mức chất lượng
+                II. TỰ ĐỀ XUẤT XẾP LOẠI MỨC CHẤT LƯỢNG
               </Typography>
 
               <Paper
@@ -1067,13 +1066,13 @@ export default forwardRef(function SelfEvaluation({
         <Box sx={{ mb: 3 }}>
           <Typography
             sx={{
-              fontSize: '0.95rem',
+              fontSize: '1.1rem',
               fontWeight: 800,
-              color: '#0f172a',
+              color: '#1e3a8a',
               mb: 1.5,
             }}
           >
-            III. Nhận xét, đánh giá của cấp có thẩm quyền
+            III. NHẬN XÉT, ĐÁNH GIÁ CỦA CẤP CÓ THẨM QUYỀN
           </Typography>
 
           <TextField
