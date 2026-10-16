@@ -617,7 +617,7 @@ export default forwardRef(function TaskCatalog({
               flexDirection: { xs: "column", sm: "row" },
               justifyContent: "space-between",
               alignItems: { xs: "flex-start", sm: "center" },
-              gap: { xs: 0.75, sm: 1 },
+              gap: { xs: 1, sm: 1 },
               p: { xs: 1.5, sm: 2 },
               bgcolor: "#172554",
               borderRadius: "10px 10px 0 0",
