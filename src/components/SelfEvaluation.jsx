@@ -638,6 +638,7 @@ export default forwardRef(function SelfEvaluation({
                   bgcolor: 'rgba(255,255,255,0.15)',
                   borderRadius: 1,
                   fontSize: '1rem',
+                  fontWeight: 500,
                 }}
               >
                 A

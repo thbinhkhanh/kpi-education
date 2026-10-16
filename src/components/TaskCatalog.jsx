@@ -613,64 +613,64 @@ export default forwardRef(function TaskCatalog({
           {/* THANH TIÊU ĐỀ CHÍNH TRÊN CÙNG BẢNG */}
           {/* THANH TIÊU ĐỀ CHÍNH TRÊN CÙNG BẢNG */}
           <Box
-  sx={{
-    p: { xs: 1.5, sm: 2 },
-    display: "flex",
-    flexDirection: { xs: "column", sm: "row" },
-    justifyContent: "space-between",
-    alignItems: { xs: "flex-start", sm: "center" },
-    gap: { xs: 1.5, sm: 1 },
-    color: "#fff",
-    bgcolor: "#172554",
-    borderRadius: "10px 10px 0 0",
-  }}
->
-  {/* Phần bên trái chứa chữ B và Tiêu đề */}
-  <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
-    <Box
-      sx={{
-        width: 30,
-        height: 30,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        bgcolor: "rgba(255,255,255,0.15)",
-        borderRadius: 1,
-        fontSize: "1rem",
-        fontWeight: 800,
-      }}
-    >
-      B
-    </Box>
+            sx={{
+              p: { xs: 1.5, sm: 2 },
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+              gap: { xs: 1.5, sm: 1 },
+              color: "#fff",
+              bgcolor: "#172554",
+              borderRadius: "10px 10px 0 0",
+            }}
+          >
+            {/* Phần bên trái chứa chữ B và Tiêu đề */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+              <Box
+                sx={{
+                  width: 30,
+                  height: 30,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'rgba(255,255,255,0.15)',
+                  borderRadius: 1,
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                }}
+              >
+                B
+              </Box>
 
-    <Typography
-      sx={{
-        fontSize: { xs: "0.8rem", sm: "inherit" },
-        fontWeight: 800,
-        lineHeight: 1.6,
-      }}
-    >
-      DANH MỤC SẢN PHẨM, NHIỆM VỤ ĐƯỢC GIAO
-    </Typography>
-  </Box>
+              <Typography
+                sx={{
+                  fontSize: { xs: "0.8rem", sm: "inherit" },
+                  fontWeight: 800,
+                  lineHeight: 1.6,
+                }}
+              >
+                DANH MỤC SẢN PHẨM, NHIỆM VỤ
+              </Typography>
+            </Box>
 
-  {/* Phần bên phải chứa điểm đạt: căn trái, rộng vừa đủ chứa nội dung */}
-  <Box
-    sx={{
-      px: 1.5,
-      py: 0.6,
-      borderRadius: 1.5,
-      bgcolor: "rgba(255,255,255,0.12)",
-      whiteSpace: "nowrap",
-      fontWeight: 800,
-      fontSize: { xs: "0.85rem", sm: "inherit" },
-      alignSelf: { xs: "flex-start", sm: "auto" }, // Căn trái trên điện thoại (thay vì stretch)
-    }}
-  >
-    Điểm đạt: {finalGroupBScore.toFixed(1)} / 70
-  </Box>
-</Box>
+            {/* Phần bên phải chứa điểm đạt: căn trái, rộng vừa đủ chứa nội dung */}
+            <Box
+              sx={{
+                px: 1.5,
+                py: 0.6,
+                borderRadius: 1.5,
+                bgcolor: "rgba(255,255,255,0.12)",
+                whiteSpace: "nowrap",
+                fontWeight: 800,
+                fontSize: { xs: "0.85rem", sm: "inherit" },
+                alignSelf: { xs: "flex-start", sm: "auto" }, // Căn trái trên điện thoại (thay vì stretch)
+              }}
+            >
+              Điểm đạt: {finalGroupBScore.toFixed(1)} / 70
+            </Box>
+          </Box>
           
           <TableContainer
             component={Paper}
