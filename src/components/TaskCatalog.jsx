@@ -626,7 +626,7 @@ export default forwardRef(function TaskCatalog({
             }}
           >
             {/* Phần bên trái chứa chữ B và Tiêu đề */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box
                 sx={{
                   width: 30,
@@ -641,7 +641,7 @@ export default forwardRef(function TaskCatalog({
                   fontWeight: 500,
                 }}
               >
-                B
+                A
               </Box>
 
               <Typography
@@ -661,11 +661,8 @@ export default forwardRef(function TaskCatalog({
                 px: 1.5,
                 py: 0.6,
                 borderRadius: 1.5,
-                bgcolor: "rgba(255,255,255,0.12)",
-                whiteSpace: "nowrap",
-                fontWeight: 800,
-                fontSize: { xs: "0.85rem", sm: "inherit" },
-                alignSelf: { xs: "flex-start", sm: "auto" }, // Căn trái trên điện thoại (thay vì stretch)
+                bgcolor: 'rgba(255,255,255,0.12)',
+                whiteSpace: 'nowrap',
               }}
             >
               Điểm đạt: {finalGroupBScore.toFixed(1)} / 70
