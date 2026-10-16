@@ -611,37 +611,36 @@ export default forwardRef(function TaskCatalog({
 
         <Box sx={{ mb: 3 }}>
           {/* THANH TIÊU ĐỀ CHÍNH TRÊN CÙNG BẢNG */}
-          {/* THANH TIÊU ĐỀ CHÍNH TRÊN CÙNG BẢNG */}
           <Box
             sx={{
-              p: { xs: 1.5, sm: 2 },
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
               justifyContent: "space-between",
               alignItems: { xs: "flex-start", sm: "center" },
-              gap: { xs: 1.5, sm: 1 },
-              color: "#fff",
+              gap: { xs: 0.75, sm: 1 },
+              p: { xs: 1.5, sm: 2 },
               bgcolor: "#172554",
               borderRadius: "10px 10px 0 0",
+              color: "#fff",
             }}
           >
             {/* Phần bên trái chứa chữ B và Tiêu đề */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
               <Box
                 sx={{
                   width: 30,
                   height: 30,
                   flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'rgba(255,255,255,0.15)',
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  bgcolor: "rgba(255,255,255,0.15)",
                   borderRadius: 1,
-                  fontSize: '1rem',
+                  fontSize: "1rem",
                   fontWeight: 500,
                 }}
               >
-                A
+                B
               </Box>
 
               <Typography
@@ -655,14 +654,16 @@ export default forwardRef(function TaskCatalog({
               </Typography>
             </Box>
 
-            {/* Phần bên phải chứa điểm đạt: căn trái, rộng vừa đủ chứa nội dung */}
+            {/* Phần bên phải chứa điểm đạt */}
             <Box
               sx={{
                 px: 1.5,
                 py: 0.6,
                 borderRadius: 1.5,
-                bgcolor: 'rgba(255,255,255,0.12)',
-                whiteSpace: 'nowrap',
+                bgcolor: "rgba(255,255,255,0.12)",
+                whiteSpace: "nowrap",
+                fontWeight: 800,
+                fontSize: { xs: "0.85rem", sm: "inherit" },
               }}
             >
               Điểm đạt: {finalGroupBScore.toFixed(1)} / 70
