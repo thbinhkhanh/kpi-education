@@ -644,7 +644,12 @@ export default forwardRef(function SelfEvaluation({
                 A
               </Box>
 
-              <Typography sx={{ fontSize: 'inherit', fontWeight: 800 }}>
+              <Typography 
+                sx={{
+                  fontSize: { xs: "0.9rem", sm: "inherit" },
+                  fontWeight: 600,
+                  lineHeight: 1.6,
+                }}>
                 NHÓM TIÊU CHÍ CHUNG (30 ĐIỂM)
               </Typography>
             </Box>
@@ -656,6 +661,9 @@ export default forwardRef(function SelfEvaluation({
                 borderRadius: 1.5,
                 bgcolor: 'rgba(255,255,255,0.12)',
                 whiteSpace: 'nowrap',
+                fontSize: { xs: "0.9rem", sm: "inherit" },
+                fontWeight: 600,
+                lineHeight: 1.6,
               }}
             >
               Điểm đạt: {formatScore(groupAScore)} / 30

@@ -645,12 +645,11 @@ export default forwardRef(function TaskCatalog({
 
               <Typography
                 sx={{
-                  fontSize: { xs: "0.8rem", sm: "inherit" },
-                  fontWeight: 800,
+                  fontSize: { xs: "0.9rem", sm: "inherit" },
+                  fontWeight: 600,
                   lineHeight: 1.6,
-                }}
-              >
-                DANH MỤC SẢN PHẨM, NHIỆM VỤ
+                }}>
+                  DANH MỤC SẢN PHẨM, NHIỆM VỤ
               </Typography>
             </Box>
 
@@ -660,10 +659,11 @@ export default forwardRef(function TaskCatalog({
                 px: 1.5,
                 py: 0.6,
                 borderRadius: 1.5,
-                bgcolor: "rgba(255,255,255,0.12)",
-                whiteSpace: "nowrap",
-                fontWeight: 800,
-                fontSize: { xs: "0.85rem", sm: "inherit" },
+                bgcolor: 'rgba(255,255,255,0.12)',
+                whiteSpace: 'nowrap',
+                fontSize: { xs: "0.9rem", sm: "inherit" },
+                fontWeight: 600,
+                lineHeight: 1.6,
               }}
             >
               Điểm đạt: {finalGroupBScore.toFixed(1)} / 70
